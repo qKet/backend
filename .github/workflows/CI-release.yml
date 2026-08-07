@@ -1,0 +1,72 @@
+# #######################################
+# CI-release.yml
+# release 브랜치에 push 시 backend 이미지 빌드 + ECR push까지만 담당.
+#
+# 배포(CD)는 argoCD가 담당:
+#   - namespace/ingress/networkpolicy → Infra/kubernetes (ArgoCD Application "infra-manifests")
+#   - Deployment/Service              → qKet/CD (ArgoCD Application "app-deploy")
+#
+# TODO: 이 워크플로우가 빌드한 이미지 태그를 qKet/CD에 write-back하는 스텝이 아직 없음 —
+# 크로스레포 인증 방식(PAT vs GitHub App, docs/cluadeDocs/ci-cd-cross-repo-auth.md 참고) 확정 후 추가.
+# #######################################
+name: Build & Push (backend, release)
+
+on:
+  push:
+    branches:
+      - release
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC로 AWS 인증하는 데 필요
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: team5/ecr/qket
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gradle 빌드를 Docker 안(멀티스테이지)이 아니라 여기서 직접 함 —
+      # cache: gradle로 의존성 캐싱되고, test 실패가 Docker 빌드 로그에 안 파묻히고
+      # 여기서 바로 실패/표시됨. bootJar만으론 test가 안 돌아서 test를 명시적으로 넣음.
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Test & build jar
+        run: |
+          chmod +x gradlew
+          ./gradlew clean test bootJar --no-daemon
+
+      # 고정 키(AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) 대신 OIDC로 인증 —
+      # 장기 자격증명을 GitHub 시크릿에 안 둠 (CI 도구 선택 ADR에서 결정한 방향).
+      # TODO: AWS_GITHUB_ACTIONS_ROLE_ARN — GitHub OIDC provider + IAM Role을 Terraform으로
+      # 아직 안 만듦. 이 role은 ECR push 권한만 최소로 가지면 됨.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 이미지 태그: backend-{커밋SHA 앞 7글자}
+      # 빌드 컨텍스트가 "."인 이유: 이 워크플로우가 이제 backend 레포 자체 안에 있어서
+      # (예전 모노레포 시절엔 "./backend"였음 — 레포 분리 후 경로 수정됨)
+      - name: Build and push backend image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          TAG=backend-$(echo ${{ github.sha }} | cut -c1-7)
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$TAG .
+          docker push $REGISTRY/$ECR_REPOSITORY:$TAG
+          echo "Pushed image: $REGISTRY/$ECR_REPOSITORY:$TAG"
