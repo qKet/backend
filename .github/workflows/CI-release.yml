@@ -45,6 +45,16 @@ jobs:
           chmod +x gradlew
           ./gradlew clean test bootJar --no-daemon
 
+      # TEMP DEBUG — 실제 OIDC 토큰의 sub/aud claim이 트러스트 정책이랑 정확히 일치하는지
+      # 눈으로 확인하기 위한 임시 스텝. 원인 찾으면 이 스텝은 지울 것.
+      - name: Debug OIDC token claims
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+            console.log(JSON.stringify(payload, null, 2));
+
       # 고정 키(AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) 대신 OIDC로 인증 —
       # 장기 자격증명을 GitHub 시크릿에 안 둠 (CI 도구 선택 ADR에서 결정한 방향).
       # TODO: AWS_GITHUB_ACTIONS_ROLE_ARN — GitHub OIDC provider + IAM Role을 Terraform으로
