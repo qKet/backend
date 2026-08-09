@@ -4,6 +4,11 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.exam.admin.mapper.MenuMapper">
 
+    <!--
+         이름            :  findAll
+         기능            :  관리자 화면의 전체 메뉴 목록(프로그램명/경로 조인) — MenuServiceImpl.getMenus
+         resultType     :  MenuDTO
+    -->
     <select id="findAll" resultType="MenuDTO">
         SELECT m.menu_id        AS menuId,
                m.program_id     AS programId,
@@ -18,11 +23,21 @@
         ORDER BY m.sort_order, m.menu_id
     </select>
 
+    <!--
+         이름            :  save
+         기능            :  신규 메뉴 저장 — MenuServiceImpl.createMenu
+         parameterType  :  MenuDTO
+    -->
     <insert id="save" parameterType="MenuDTO" useGeneratedKeys="true" keyProperty="menuId">
         INSERT INTO MENUS (program_id, parent_menu_id, menu_nm, sort_order, use_yn, ins_id, ins_ip)
         VALUES (#{programId}, #{parentMenuId}, #{menuNm}, COALESCE(#{sortOrder}, 0), COALESCE(#{useYn}, 'Y'), #{insId}, #{insIp})
     </insert>
 
+    <!--
+         이름            :  updateMenu
+         기능            :  메뉴 수정 — MenuServiceImpl.updateMenu
+         parameterType  :  MenuDTO
+    -->
     <!-- program_id/parent_menu_id는 "그룹 전용 메뉴로 바꾸기(연결 프로그램 없음)" / "최상위로 바꾸기(상위 메뉴 없음)"처럼
          명시적으로 NULL로 지우는 게 정상 케이스라 <if>로 감싸면 안 됨 — 프론트가 항상 그 행의 전체 값을 보내는 걸 전제로 무조건 갱신 -->
     <update id="updateMenu" parameterType="MenuDTO">
@@ -39,10 +54,20 @@
         WHERE menu_id = #{menuId}
     </update>
 
+    <!--
+         이름            :  deleteMenu
+         기능            :  메뉴 삭제 — MenuServiceImpl.deleteMenu
+         parameterType  :  long
+    -->
     <delete id="deleteMenu" parameterType="long">
         DELETE FROM MENUS WHERE menu_id = #{menuId}
     </delete>
 
+    <!--
+         이름            :  findMyMenus
+         기능            :  로그인한 사용자의 role_id 기준 접근 가능한 메뉴 조회 — MenuServiceImpl.getMyMenuTree에서 트리로 조립 후 빈 그룹 메뉴 정리
+         resultType     :  MenuDTO
+    -->
     <!-- 연결 프로그램이 없는 "그룹 전용" 메뉴(program_id IS NULL)는 역할 상관없이 항상 후보로 포함시키고,
          실제로 보여줄지는 서비스단에서 트리를 만든 뒤 "하위메뉴가 하나도 안 남았으면 그룹 자체를 제거"하는 방식으로 정리함 -->
     <select id="findMyMenus" resultType="MenuDTO">

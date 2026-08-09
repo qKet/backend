@@ -4,6 +4,12 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.exam.reservation.mapper.ReservationMapper">
 
+    <!--
+         이름            :  save
+         기능            :  좌석 예매 확정 — WHERE절에 user_id IS NULL까지 걸려있어 이미 예매된 좌석이면 0건 갱신되고 실패 처리됨
+                            (ReservationServiceImpl.reserve, Redis 분산 락과 별개로 DB 레벨에서도 동시성을 보장하는 마지막 방어선)
+         parameterType  :  ReservationDTO
+    -->
     <update id="save" parameterType="ReservationDTO">
         UPDATE RESERVATIONS
         SET user_id         = #{userId},
@@ -17,6 +23,11 @@
           AND user_id IS NULL
     </update>
 
+    <!--
+         이름            :  insertHistory
+         기능            :  예매/취소 이력 기록 — reserve()/cancel() 양쪽에서 action(RESERVED/CANCELLED)만 다르게 해서 호출
+         parameterType  :  ReservationDTO
+    -->
     <insert id="insertHistory" parameterType="ReservationDTO">
         INSERT INTO RESERVATION_HISTORY (user_id, seat_id, round_id, performance_id, action, ins_id, ins_ip)
         SELECT #{userId}, #{seatId}, #{roundId}, performance_id, #{action}, #{insId}, #{insIp}
@@ -24,6 +35,12 @@
         WHERE round_id = #{roundId}
     </insert>
 
+    <!--
+         이름            :  findByUserId
+         기능            :  내 예매 내역 조회 — 좌석/회차별 최신 이력(MAX history_id)만 뽑아서 지금 상태를 보여줌(ReservationServiceImpl.getMyReservations)
+         resultType     :  ReservationDTO
+         parameterType  :  String
+    -->
     <select id="findByUserId" resultType="ReservationDTO" parameterType="String">
         SELECT h.history_id      AS historyId,
                r.reservation_id  AS reservationId,
@@ -53,6 +70,12 @@
         ORDER BY h.created_at DESC
     </select>
 
+    <!--
+         이름            :  findById
+         기능            :  예매 단건 조회 — 취소 전 소유자/상태 확인용(ReservationServiceImpl.cancel)
+         resultType     :  ReservationDTO
+         parameterType  :  Long
+    -->
     <select id="findById" resultType="ReservationDTO" parameterType="Long">
         SELECT reservation_id  AS reservationId,
                user_id         AS userId,
@@ -64,6 +87,10 @@
         WHERE reservation_id = #{reservationId}
     </select>
 
+    <!--
+         이름            :  cancel
+         기능            :  예매 취소 — user_id를 NULL로 되돌려 좌석을 AVAILABLE로 반납(ReservationServiceImpl.cancel)
+    -->
     <update id="cancel">
         UPDATE RESERVATIONS
         SET user_id         = NULL,
