@@ -1,0 +1,114 @@
+# #######################################
+# CI-release.yml
+# release 브랜치에 push 시 backend 이미지 빌드 + ECR push + qKet/CD write-back까지 담당.
+#
+# 배포(CD)는 argoCD가 담당:
+#   - namespace/ingress/networkpolicy → Infra/kubernetes (ArgoCD Application "infra-manifests")
+#   - Deployment/Service              → qKet/CD (ArgoCD Application "app-deploy")
+#
+# qKet/CD write-back 인증: GitHub App(qket-ci-bot, qKet 조직 소유, CD 레포에만 설치,
+# Contents:Read-and-write 권한만) — PAT 대신 이 방식을 쓴 이유는 장기 자격증명을 시크릿에
+# 안 두기 위해서(QKET_CI_APP_PRIVATE_KEY로 실행할 때마다 ~1시간짜리 토큰을 새로 발급받음).
+# #######################################
+name: Build & Push (backend, release)
+
+on:
+  push:
+    branches:
+      - release
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC로 AWS 인증하는 데 필요
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: team5/ecr/qket
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gradle 빌드
+      # cache: gradle로 의존성 캐싱되고
+      # 여기서 바로 실패/표시됨. bootJar만으론 test가 안 돌아서 test를 명시적으로 넣음.
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Test & build jar
+        run: |
+          chmod +x gradlew
+          ./gradlew clean test bootJar --no-daemon
+
+      # 고정 키(AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) 대신 OIDC로 인증 —
+      # 장기 자격증명을 GitHub 시크릿에 안 둠 (CI 도구 선택 ADR에서 결정한 방향).
+      # TODO: AWS_GITHUB_ACTIONS_ROLE_ARN — GitHub OIDC provider + IAM Role을 Terraform으로
+      # 아직 안 만듦. 이 role은 ECR push 권한만 최소로 가지면 됨.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 이미지 태그: backend-{커밋SHA 앞 7글자} — 뒤 write-back 스텝에서도 같은 값을 써야 해서
+      # step output으로 뽑아둠(태그 계산 로직이 두 군데(빌드/write-back)서 따로 계산되다 어긋나는 걸 방지).
+      - name: Compute image tag
+        id: tag
+        run: echo "tag=backend-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      # 빌드 컨텍스트가 "."인 이유: 이 워크플로우가 이제 backend 레포 자체 안에 있어서
+      # (예전 모노레포 시절엔 "./backend"였음 — 레포 분리 후 경로 수정됨)
+      - name: Build and push backend image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$TAG .
+          docker push $REGISTRY/$ECR_REPOSITORY:$TAG
+          echo "Pushed image: $REGISTRY/$ECR_REPOSITORY:$TAG"
+
+      # qket-ci-bot GitHub App으로 qKet/CD 레포에만 유효한 단명 토큰 발급.
+      - name: Get GitHub App token for CD repo
+        id: cd-app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.QKET_CI_APP_ID }}
+          private-key: ${{ secrets.QKET_CI_APP_PRIVATE_KEY }}
+          owner: qKet
+          repositories: CD
+
+      - name: Checkout qKet/CD
+        uses: actions/checkout@v4
+        with:
+          repository: qKet/CD
+          token: ${{ steps.cd-app-token.outputs.token }}
+          path: cd-repo
+
+      # helm/values.yaml의 "backend:" 블록 안 첫 image 줄만 찾아서 값 교체 — 처음엔
+      # BACKEND_IMAGE 플레이스홀더였다가 이후로는 이전에 써둔 실제 이미지 값이 들어있어도
+      # (idempotent) 항상 동작. 이름 뒤에 붙는 주석에 의존하지 않고 "backend:" 다음 줄부터
+      # 다음 최상위 키(들여쓰기 없는 줄) 전까지로 범위를 좁혀서 frontend.image를 안 건드림.
+      - name: Update image tag in qKet/CD
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$TAG"
+          cd cd-repo
+          sed -i -E "/^backend:/,/^[a-zA-Z]/ s|^(  image: ).*|\1$IMAGE|" helm/values.yaml
+          git config user.name "qket-ci-bot[bot]"
+          git config user.email "qket-ci-bot[bot]@users.noreply.github.com"
+          git add helm/values.yaml
+          git diff --cached --quiet && echo "No image change, skip commit" && exit 0
+          git commit -m "chore: update backend image to $TAG"
+          git push
