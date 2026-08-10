@@ -1,0 +1,83 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:qket}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:1234}
+    hikari:
+      # 기본값(10)은 부하테스트 시 동시 요청이 몰리면 금방 병목이 되어서 상향 조정
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: 5
+
+  sql:
+    init:
+      mode: never
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  session:
+    store-type: redis
+    timeout: 1800s
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
+  endpoint:
+    health:
+      show-details: never
+
+  metrics:
+    tags:
+      application: qket-backend
+# AWS S3
+cloud:
+  aws:
+    s3:
+      bucket: ${S3_BUCKET:qket-posters}
+    region:
+      static: ${AWS_REGION:ap-northeast-2}
+    cloudfront:
+      domain: ${CLOUDFRONT_DOMAIN:}
+
+# mybatis
+mybatis:
+  mapper-locations: com/exam/**/mapper/*.xml
+  type-aliases-package: com.exam.common.dto, com.exam.reservation.dto, com.exam.auth.dto, com.exam.admin.dto, com.exam.payment.dto
+  map-underscore-to-camel-case: true
+
+# App - 소셜 로그인 완료 후 리다이렉트할 프론트엔드 origin
+app:
+  base-url: ${APP_BASE_URL:http://localhost:3000}
+
+# 소셜 로그인 (OAuth2) client-id/secret — 각 provider 개발자 콘솔에서 발급
+oauth:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+  naver:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
+
+# 토스페이먼츠 시크릿 키 — 기본값은 토스 공식 위젯 연동 가이드에 공개된 테스트 전용 키
+# (frontend/.env.local 의 NEXT_PUBLIC_TOSS_CLIENT_KEY=test_gck_docs_... 와 짝을 이루는 시크릿 키)
+toss:
+  secret-key: ${TOSS_SECRET_KEY:test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6}

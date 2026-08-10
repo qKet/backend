@@ -6,6 +6,10 @@ services:
       MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: qket
       MYSQL_CHARSET: utf8mb4
+      # TZ 없으면 이 이미지는 컨테이너 시간대가 UTC로 잡혀서 NOW()/CURRENT_TIMESTAMP가 호스트(KST)보다
+      # 9시간 느려짐 — created_reserved/ins_de/upt_de처럼 화면에 그대로 노출되는 타임스탬프가 실제
+      # 시각과 어긋나 보이는 원인. 관리자 보고서·최종수정일 같은 기능이 생기면서 실제로 드러남.
+      TZ: Asia/Seoul
     ports:
       - "3306:3306"
     volumes:

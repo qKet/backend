@@ -112,6 +112,18 @@ public class ReservationServiceImpl implements ReservationService {
         return reservationMapper.findByUserId(userId);
     }
 
+    /***********************************
+     *  이름      :  getHistoryForAdmin
+     *  기능      :  관리자 "예매 활동 로그" 보고서 — 기간(필수) + 사용자/액션(선택) 필터로
+     *              RESERVATION_HISTORY 조회. 권한 체크는 AdminReservationController가 전담.
+     *  param    :  String,String,String,String
+     *  return   :  List<ReservationDTO>
+     ************************************/
+    @Override
+    public List<ReservationDTO> getHistoryForAdmin(String from, String to, String userId, String action) {
+        return reservationMapper.findHistoryForAdmin(from, to, userId, action);
+    }
+
     @Override
     @Transactional
     /***********************************
