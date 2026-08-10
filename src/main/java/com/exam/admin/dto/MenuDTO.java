@@ -3,6 +3,8 @@ package com.exam.admin.dto;
 import lombok.Data;
 import org.apache.ibatis.type.Alias;
 
+import java.time.LocalDateTime;
+
 @Data
 @Alias("MenuDTO")
 public class MenuDTO {
@@ -20,4 +22,5 @@ public class MenuDTO {
     private String insIp;
     private String uptId;
     private String uptIp;
+    private LocalDateTime uptDe;
 }
