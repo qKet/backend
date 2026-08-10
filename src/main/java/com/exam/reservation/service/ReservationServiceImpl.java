@@ -3,15 +3,14 @@ package com.exam.reservation.service;
 import com.exam.queue.service.QueueService;
 import com.exam.reservation.dto.ReservationDTO;
 import com.exam.reservation.mapper.ReservationMapper;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 /**
  *
  파일명: ReservationServiceImpl.java
@@ -20,30 +19,15 @@ import java.util.Map;
 @Service
 public class ReservationServiceImpl implements ReservationService {
 
-    // 락을 "내가 잡은 락일 때만" 지우기 위한 compare-and-delete 스크립트
-    // (TTL 만료 후 다른 요청이 같은 키로 새 락을 잡았는데, 원래 요청이 뒤늦게 끝나면서
-    //  남의 락을 그냥 지워버리는 것을 방지 — RedisQueueRepository의 DELETE_IF_MATCHES와 동일한 패턴)
-    private static final DefaultRedisScript<Long> DELETE_IF_MATCHES =
-            new DefaultRedisScript<>(
-                    """
-                    if redis.call('get', KEYS[1]) == ARGV[1] then
-                        return redis.call('del', KEYS[1])
-                    else
-                        return 0
-                    end
-                    """,
-                    Long.class
-            );
-
     private final ReservationMapper reservationMapper;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedissonClient redissonClient;
     private final QueueService queueService;
 
     public ReservationServiceImpl(ReservationMapper reservationMapper,
-                                  RedisTemplate<String, Object> redisTemplate,
+                                  RedissonClient redissonClient,
                                   QueueService queueService) {
         this.reservationMapper = reservationMapper;
-        this.redisTemplate = redisTemplate;
+        this.redissonClient = redissonClient;
         this.queueService = queueService;
     }
 
@@ -51,16 +35,27 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     /***********************************
      *  이름      :   reserve
-     *  기능      :   공연 좌석 예매 (동시성 처리)
+     *  기능      :   공연 좌석 예매 (동시성 처리) — HOLD01_HOLD03: 락 구현을 직접 짠 SETNX+Lua에서
+     *              Redisson RLock으로 교체. 동작(동일 좌석 동시요청 중 1건만 성공)은 기존과 동일
      *  param    :  String,Long,Long,Long,String
      *  return   :   Map<String, Object>
      ************************************/
     public Map<String, Object> reserve(String userId, Long reservationId, Long roundId, Long seatId, String queueToken, String clientIp) {
         String lockKey = "lock:reservation:" + seatId;
+        RLock lock = redissonClient.getLock(lockKey);
 
-        // Redis 분산 락 획득 시도 (TTL 10초)
-        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, userId.toString(), Duration.ofSeconds(10));
-        if (acquired == null || !acquired) {
+        // waitTime=0: 기존 SETNX와 동일하게 "선점 실패 시 대기하지 않고 즉시 실패" 유지.
+        // leaseTime=10초: 기존 TTL(10초)과 동일 — 이 값을 주면 Redisson의 자동 연장(watchdog)이 꺼지고
+        // 정확히 10초 뒤 자동 해제됨. (watchdog을 쓰려면 leaseTime을 아예 생략해야 하는데,
+        // "기존로직 유지" 요구사항이라 TTL을 그대로 고정값 10초로 맞춤 — 코드 리뷰 참고)
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(0, 10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Map.of("success", false, "message", "예매 처리 중 오류가 발생했습니다.");
+        }
+        if (!acquired) {
             return Map.of("success", false, "message", "이미 다른 사용자가 예매 중인 좌석입니다.");
         }
 
@@ -97,14 +92,13 @@ public class ReservationServiceImpl implements ReservationService {
 
             return Map.of("success", true, "message", "예매가 완료되었습니다.");
         } finally {
-            // 무조건 delete 하지 않고, 락 값이 내가 setIfAbsent 로 저장한 값(userId)과
-            // 일치할 때만 지움 — TTL(10초) 만료 후 다른 요청이 같은 좌석 락을 새로 잡았는데
-            // 이 요청이 뒤늦게 끝나면서 남의 락을 지워버리는 것을 방지
-            redisTemplate.execute(
-                    DELETE_IF_MATCHES,
-                    Collections.singletonList(lockKey),
-                    userId.toString()
-            );
+            // isHeldByCurrentThread()로 먼저 확인하는 이유: TTL(10초)이 이미 만료돼서 다른 스레드가
+            // 새로 락을 잡은 상태에서 이 스레드가 뒤늦게 unlock()을 호출하면 IllegalMonitorStateException이
+            // 나거나(Redisson이 소유자 아님을 감지) 최악의 경우 남의 락을 풀어버릴 수 있음 —
+            // 기존 compare-and-delete Lua 스크립트가 하던 일을 Redisson이 이 체크로 대신해줌
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
     /***********************************
