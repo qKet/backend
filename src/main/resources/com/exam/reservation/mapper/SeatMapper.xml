@@ -4,6 +4,12 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.exam.reservation.mapper.SeatMapper">
 
+    <!--
+         이름            :  findByRoundId
+         기능            :  회차별 좌석 전체 조회(현재 예약 상태 포함) — SeatServiceImpl.getSeatsByRound, 좌석 배치도 화면용
+         resultType     :  SeatDTO
+         parameterType  :  Long
+    -->
     <select id="findByRoundId" resultType="SeatDTO" parameterType="Long">
         SELECT r.reservation_id AS reservationId,
                 s.seat_id        AS seatId,
@@ -17,6 +23,12 @@
         ORDER BY s.seat_row, s.seat_colume
     </select>
 
+    <!--
+         이름            :  findById
+         기능            :  좌석 단건 조회 — SeatServiceImpl.getSeat, PaymentServiceImpl.confirm에서 결제 금액 검증(등급별 가격 대조)용으로도 쓰임
+         resultType     :  SeatDTO
+         parameterType  :  Long
+    -->
     <select id="findById" resultType="SeatDTO" parameterType="Long">
         SELECT seat_id     AS seatId,
                seat_row    AS seatRow,
@@ -26,6 +38,12 @@
         WHERE seat_id = #{seatId}
     </select>
 
+    <!--
+         이름            :  updateStatus
+         기능            :  좌석 상태 직접 변경 — 현재 Java 코드 어디서도 호출하는 곳이 없음(orphan). 실제 좌석 상태 변경은
+                            ReservationMapper.save/cancel이 RESERVATIONS 테이블로 처리하고 있어서, 이 메서드가 왜 남아있는지
+                            (다른 흐름에서 쓸 예정이었는지 등) 확인이 필요함.
+    -->
     <update id="updateStatus">
         UPDATE SEATS
         SET status = #{status}
