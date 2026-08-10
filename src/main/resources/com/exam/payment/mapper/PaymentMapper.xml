@@ -4,11 +4,22 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.exam.payment.mapper.PaymentMapper">
 
+    <!--
+         이름            :  save
+         기능            :  결제 승인 완료 후 저장 — PaymentServiceImpl.confirm(), findByOrderId 멱등성 체크 통과한 뒤에만 호출됨
+         parameterType  :  PaymentDTO
+    -->
     <insert id="save" parameterType="PaymentDTO" useGeneratedKeys="true" keyProperty="paymentId">
         INSERT INTO PAYMENTS (reservation_id, user_id, order_id, payment_key, amount, pay_status, approved_at, ins_id, ins_ip)
         VALUES (#{reservationId}, #{userId}, #{orderId}, #{paymentKey}, #{amount}, #{payStatus}, #{approvedAt}, #{insId}, #{insIp})
     </insert>
 
+    <!--
+         이름            :  findByOrderId
+         기능            :  멱등성 체크 — 같은 orderId로 이미 처리된 결제가 있으면 재처리 없이 그대로 반환(PaymentServiceImpl.confirm)
+         resultType     :  PaymentDTO
+         parameterType  :  String
+    -->
     <select id="findByOrderId" resultType="PaymentDTO" parameterType="String">
         SELECT payment_id     AS paymentId,
                reservation_id AS reservationId,
@@ -22,6 +33,12 @@
         WHERE order_id = #{orderId}
     </select>
 
+    <!--
+         이름            :  findByUserId
+         기능            :  내 결제 내역 조회 — 좌석/공연/회차까지 조인해서 한 번에 반환(PaymentServiceImpl.getMyPayments), deleted_yn='N'만 노출
+         resultType     :  PaymentDTO
+         parameterType  :  String
+    -->
     <select id="findByUserId" resultType="PaymentDTO" parameterType="String">
         SELECT p.payment_id     AS paymentId,
                p.reservation_id AS reservationId,
@@ -46,6 +63,12 @@
         ORDER BY p.approved_at DESC
     </select>
 
+    <!--
+         이름            :  findById
+         기능            :  결제 상세 조회 — 취소/삭제 전 소유자·상태 확인용(PaymentServiceImpl.cancelPayment/deletePayment)
+         resultType     :  PaymentDTO
+         parameterType  :  Long
+    -->
     <select id="findById" resultType="PaymentDTO" parameterType="Long">
         SELECT p.payment_id     AS paymentId,
                p.reservation_id AS reservationId,
@@ -68,6 +91,10 @@
         WHERE p.payment_id = #{paymentId}
     </select>
 
+    <!--
+         이름            :  updateStatus
+         기능            :  결제 상태 변경 — 취소 처리 시 CANCELED로 갱신(PaymentServiceImpl.cancelPayment)
+    -->
     <update id="updateStatus">
         UPDATE PAYMENTS
         SET pay_status = #{payStatus},
@@ -76,6 +103,10 @@
         WHERE payment_id = #{paymentId}
     </update>
 
+    <!--
+         이름            :  markDeleted
+         기능            :  결제 내역 소프트 삭제(deleted_yn='Y') — CANCELED 상태인 결제만 지울 수 있음(PaymentServiceImpl.deletePayment)
+    -->
     <update id="markDeleted">
         UPDATE PAYMENTS
         SET deleted_yn = 'Y',
