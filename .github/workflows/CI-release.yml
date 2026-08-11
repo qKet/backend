@@ -29,6 +29,33 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # DemoApplicationTests의 contextLoads()가 스프링 컨텍스트를 통째로 띄우는데, DataSource/Redisson
+    # 빈이 시작 시점에 실제 연결을 시도함 — application.yml의 기본값(DB_HOST/REDIS_HOST 둘 다
+    # localhost)이 CI 러너 안엔 아무것도 없어서 연결 실패로 테스트가 죽었었음(실제로 겪음).
+    # 테스트용으로만 잠깐 떴다 사라지는 컨테이너라 비밀번호(1234)가 노출돼도 무해함 — 로컬
+    # docker-compose랑 값 맞춰서 별도 설정 없이 application.yml 기본값 그대로 연결되게 함.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: "1234"
+          MYSQL_DATABASE: qket
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -p1234"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
     steps:
       - uses: actions/checkout@v4
 
