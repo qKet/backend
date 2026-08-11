@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.reservation.mapper.PerformanceMapper">
+
+    <resultMap id="performanceMap" type="PerformanceDTO">
+        <id property="performanceId" column="performance_id"/>
+        <result property="venueId" column="venue_id"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryNm" column="category_nm"/>
+        <result property="pTitle" column="p_title"/>
+        <result property="pLocation" column="venue_name"/>
+        <result property="posterUrl" column="poster_url"/>
+        <collection property="rounds" ofType="RoundDTO">
+            <id property="roundId" column="round_id"/>
+            <result property="roundTime" column="round_time"/>
+            <result property="openTime" column="open_time"/>
+            <result property="roundStatus" column="round_status"/>
+        </collection>
+    </resultMap>
+
+    <select id="findAllVenues" resultType="VenueDTO">
+        SELECT venue_id AS venueId, venue_name AS venueName FROM VENUE ORDER BY venue_id
+    </select>
+
+    <insert id="insert" parameterType="PerformanceDTO" useGeneratedKeys="true" keyProperty="performanceId">
+        INSERT INTO PERFORMANCES (p_title, venue_id, category_id, poster_url, ins_id, ins_ip)
+        VALUES (#{pTitle}, #{venueId}, #{categoryId}, #{posterUrl}, #{insId}, #{insIp})
+    </insert>
+
+    <insert id="insertRound" parameterType="RoundDTO" useGeneratedKeys="true" keyProperty="roundId">
+        INSERT INTO PERFORMANCE_ROUND (performance_id, round_time, open_time, round_status, ins_id, ins_ip)
+        VALUES (#{performanceId}, #{roundTime}, #{openTime}, 'OPEN', #{insId}, #{insIp})
+    </insert>
+
+    <insert id="initReservationSlots">
+        INSERT INTO RESERVATIONS (user_id, seat_id, round_id, performance_id, reserved_status, ins_id, ins_ip)
+        SELECT NULL, s.seat_id, #{roundId}, #{performanceId}, 'AVAILABLE', #{insId}, #{insIp}
+        FROM SEATS s
+        JOIN PERFORMANCES p ON s.venue_id = p.venue_id
+        WHERE p.performance_id = #{performanceId}
+    </insert>
+
+    <select id="findAll" resultMap="performanceMap">
+        SELECT  A.performance_id,
+                A.venue_id,
+                A.category_id,
+                C.category_nm,
+                A.p_title,
+                V.venue_name,
+                A.poster_url,
+                A.created_per,
+                B.round_id,
+                B.round_time,
+                B.open_time,
+                B.round_status
+        FROM PERFORMANCES A
+        LEFT OUTER JOIN VENUE V ON A.venue_id = V.venue_id
+        LEFT OUTER JOIN CATEGORIES C ON A.category_id = C.category_id
+        LEFT OUTER JOIN PERFORMANCE_ROUND B ON A.performance_id = B.performance_id
+        <where>
+            <if test="categoryId != null">AND A.category_id = #{categoryId}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (A.p_title LIKE CONCAT('%', #{keyword}, '%') OR V.venue_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY A.created_per DESC
+    </select>
+
+
+    <!-- 캐스팅 -->
+    <select id="findById" parameterType="Long" resultMap="performanceMap">
+        SELECT  A.performance_id,
+        A.venue_id,
+        A.p_title,
+        V.venue_name,
+        A.poster_url,
+        A.created_per,
+        B.round_id,
+        B.round_time,
+        B.open_time,
+        B.round_status
+        FROM PERFORMANCES A
+        LEFT OUTER JOIN VENUE V ON A.venue_id = V.venue_id
+        LEFT OUTER JOIN PERFORMANCE_ROUND B ON A.performance_id = B.performance_id
+        WHERE A.performance_id = #{performanceId}
+        ORDER BY B.round_time
+    </select>
+
+    <select id="findCastsByPerformanceId" parameterType="Long" resultType="CastDTO">
+        SELECT cast_id AS castId,
+               performance_id AS performanceId,
+               round_id AS roundId,
+               actor_nm AS actorName,
+               casting_nm AS castingNm,
+               sort_order AS sortOrder
+        FROM PERFORMANCE_CAST
+        WHERE performance_id = #{performanceId}
+        ORDER BY sort_order, cast_id
+    </select>
+
+    <select id="findRoundsByMonth" resultType="RoundDTO">
+        SELECT round_id AS roundId,
+                performance_id AS performanceId,
+                round_time AS roundTime,
+                open_time AS openTime,
+                round_status AS roundStatus
+        FROM PERFORMANCE_ROUND
+        WHERE performance_id = #{performanceId}
+            AND DATE_FORMAT(round_time, '%Y-%m') = #{month}
+        ORDER BY round_time
+    </select>
+
+    <!-- 페이지네이션용: PERFORMANCES 를 먼저 LIMIT/OFFSET 으로 자른 뒤 회차(PERFORMANCE_ROUND)를 재조인.
+         findAll처럼 조인 후에 바로 LIMIT을 걸면 회차가 여러 개인 공연이 페이지 경계에서 잘릴 수 있어서
+         이렇게 서브쿼리로 공연 단위 페이지를 먼저 확정한다. -->
+    <select id="findAllPaged" resultMap="performanceMap">
+        SELECT  A.performance_id,
+                A.venue_id,
+                A.category_id,
+                C.category_nm,
+                A.p_title,
+                V.venue_name,
+                A.poster_url,
+                A.created_per,
+                B.round_id,
+                B.round_time,
+                B.open_time,
+                B.round_status
+        FROM (
+            SELECT P.performance_id, P.venue_id, P.category_id, P.p_title, P.poster_url, P.created_per
+            FROM PERFORMANCES P
+            LEFT OUTER JOIN VENUE V ON P.venue_id = V.venue_id
+            <where>
+                <if test="categoryId != null">AND P.category_id = #{categoryId}</if>
+                <if test="keyword != null and keyword != ''">
+                    AND (P.p_title LIKE CONCAT('%', #{keyword}, '%') OR V.venue_name LIKE CONCAT('%', #{keyword}, '%'))
+                </if>
+            </where>
+            ORDER BY P.created_per DESC
+            LIMIT #{size} OFFSET #{offset}
+        ) A
+        LEFT OUTER JOIN VENUE V ON A.venue_id = V.venue_id
+        LEFT OUTER JOIN CATEGORIES C ON A.category_id = C.category_id
+        LEFT OUTER JOIN PERFORMANCE_ROUND B ON A.performance_id = B.performance_id
+        ORDER BY A.created_per DESC, B.round_time ASC
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(*)
+        FROM PERFORMANCES P
+        LEFT OUTER JOIN VENUE V ON P.venue_id = V.venue_id
+        <where>
+            <if test="categoryId != null">AND P.category_id = #{categoryId}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (P.p_title LIKE CONCAT('%', #{keyword}, '%') OR V.venue_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <select id="hasPassedRound" parameterType="Long" resultType="boolean">
+        SELECT COUNT(*) > 0 FROM PERFORMANCE_ROUND
+        WHERE performance_id = #{performanceId} AND open_time &lt;= NOW()
+    </select>
+
+    <select id="hasPassedRoundById" parameterType="Long" resultType="boolean">
+        SELECT COUNT(*) > 0 FROM PERFORMANCE_ROUND
+        WHERE round_id = #{roundId} AND open_time &lt;= NOW()
+    </select>
+
+    <update id="updatePerformance" parameterType="PerformanceDTO">
+        UPDATE PERFORMANCES
+        <set>
+            <if test="pTitle != null">p_title = #{pTitle},</if>
+            <if test="posterUrl != null">poster_url = #{posterUrl},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            upt_id = #{uptId},
+            upt_ip = #{uptIp},
+        </set>
+        WHERE performance_id = #{performanceId}
+    </update>
+
+    <delete id="deleteReservationHistoryByPerformanceId">
+        DELETE FROM RESERVATION_HISTORY WHERE performance_id = #{performanceId}
+    </delete>
+
+    <delete id="deleteReservationsByPerformanceId">
+        DELETE FROM RESERVATIONS WHERE performance_id = #{performanceId}
+    </delete>
+
+    <delete id="deleteRoundsByPerformanceId">
+        DELETE FROM PERFORMANCE_ROUND WHERE performance_id = #{performanceId}
+    </delete>
+
+    <delete id="deletePerformance">
+        DELETE FROM PERFORMANCES WHERE performance_id = #{performanceId}
+    </delete>
+
+    <delete id="deleteReservationHistoryByRoundId">
+        DELETE FROM RESERVATION_HISTORY WHERE round_id = #{roundId}
+    </delete>
+
+    <delete id="deleteReservationsByRoundId">
+        DELETE FROM RESERVATIONS WHERE round_id = #{roundId}
+    </delete>
+
+    <delete id="deleteRound">
+        DELETE FROM PERFORMANCE_ROUND WHERE round_id = #{roundId}
+    </delete>
+
+    <update id="updateRound" parameterType="RoundDTO">
+        UPDATE PERFORMANCE_ROUND
+        SET round_time = #{roundTime}, open_time = #{openTime}, upt_id = #{uptId}, upt_ip = #{uptIp}
+        WHERE round_id = #{roundId}
+    </update>
+
+</mapper>

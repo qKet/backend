@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.payment.mapper.PaymentMapper">
+
+    <insert id="save" parameterType="PaymentDTO" useGeneratedKeys="true" keyProperty="paymentId">
+        INSERT INTO PAYMENTS (reservation_id, user_id, order_id, payment_key, amount, pay_status, approved_at, ins_id, ins_ip)
+        VALUES (#{reservationId}, #{userId}, #{orderId}, #{paymentKey}, #{amount}, #{payStatus}, #{approvedAt}, #{insId}, #{insIp})
+    </insert>
+
+    <select id="findByOrderId" resultType="PaymentDTO" parameterType="String">
+        SELECT payment_id     AS paymentId,
+               reservation_id AS reservationId,
+               user_id        AS userId,
+               order_id       AS orderId,
+               payment_key    AS paymentKey,
+               amount,
+               pay_status     AS payStatus,
+               approved_at    AS approvedAt
+        FROM PAYMENTS
+        WHERE order_id = #{orderId}
+    </select>
+
+    <select id="findByUserId" resultType="PaymentDTO" parameterType="String">
+        SELECT p.payment_id     AS paymentId,
+               p.reservation_id AS reservationId,
+               p.user_id        AS userId,
+               p.order_id       AS orderId,
+               p.payment_key    AS paymentKey,
+               p.amount,
+               p.pay_status     AS payStatus,
+               p.approved_at    AS approvedAt,
+               s.seat_row       AS seatRow,
+               s.seat_colume    AS seatColume,
+               s.grade,
+               perf.p_title     AS pTitle,
+               pr.round_time    AS roundTime
+        FROM PAYMENTS p
+                 JOIN RESERVATIONS r ON p.reservation_id = r.reservation_id
+                 JOIN SEATS s ON r.seat_id = s.seat_id
+                 JOIN PERFORMANCE_ROUND pr ON r.round_id = pr.round_id
+                 JOIN PERFORMANCES perf ON pr.performance_id = perf.performance_id
+        WHERE p.user_id = #{userId}
+          AND p.deleted_yn = 'N'
+        ORDER BY p.approved_at DESC
+    </select>
+
+    <select id="findById" resultType="PaymentDTO" parameterType="Long">
+        SELECT p.payment_id     AS paymentId,
+               p.reservation_id AS reservationId,
+               p.user_id        AS userId,
+               p.order_id       AS orderId,
+               p.payment_key    AS paymentKey,
+               p.amount,
+               p.pay_status     AS payStatus,
+               p.approved_at    AS approvedAt,
+               s.seat_row       AS seatRow,
+               s.seat_colume    AS seatColume,
+               s.grade,
+               perf.p_title     AS pTitle,
+               pr.round_time    AS roundTime
+        FROM PAYMENTS p
+                 JOIN RESERVATIONS r ON p.reservation_id = r.reservation_id
+                 JOIN SEATS s ON r.seat_id = s.seat_id
+                 JOIN PERFORMANCE_ROUND pr ON r.round_id = pr.round_id
+                 JOIN PERFORMANCES perf ON pr.performance_id = perf.performance_id
+        WHERE p.payment_id = #{paymentId}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE PAYMENTS
+        SET pay_status = #{payStatus},
+            upt_id      = #{uptId},
+            upt_ip      = #{uptIp}
+        WHERE payment_id = #{paymentId}
+    </update>
+
+    <update id="markDeleted">
+        UPDATE PAYMENTS
+        SET deleted_yn = 'Y',
+            upt_id     = #{uptId},
+            upt_ip     = #{uptIp}
+        WHERE payment_id = #{paymentId}
+    </update>
+
+</mapper>

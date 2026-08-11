@@ -26,6 +26,9 @@ dependencies {
 	//redis
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.springframework.session:spring-session-data-redis'
+	// HOLD01_HOLD03: 좌석 동시 선점 방지용 분산 락(RLock). spring.data.redis.host/port를 그대로
+	// 읽어서 붙으므로(스타터 자동설정) 별도 접속 설정 불필요 — 세션/대기열과 같은 Redis 인스턴스를 공유함
+	implementation 'org.redisson:redisson-spring-boot-starter:3.50.0'
 
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'

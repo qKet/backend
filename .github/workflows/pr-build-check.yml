@@ -1,7 +1,13 @@
 # #######################################
 # pr-build-check.yml
 # dev,release,main 브렌치 PR 생성시 동작
-# 프론트앤드 Node.js 20, 백엔드 JAVA21으로 빌드 잘 되는지 체킹
+# 백엔드 JAVA21으로 빌드 잘 되는지 체킹
+#
+# [수정 이력] 예전 모노레포(backend/, frontend/ 하위 폴더 구조) 시절 파일을
+# 저장소 분리 후에도 그대로 복사해와서, working-directory: backend/frontend가
+# 이 레포(루트 자체가 backend 프로젝트)에서 전부 즉시 실패하고 있었음.
+# frontend-build job은 이 레포에 프론트 코드가 없으므로 제거 — 프론트 빌드체크는
+# frontend 레포 쪽에 별도로 있어야 함(아직 없다면 그쪽에 추가 필요).
 # #######################################
 
 name: PR Build Check
@@ -25,10 +31,6 @@ jobs:
     name: Backend Build
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,28 +47,3 @@ jobs:
 
       - name: Build backend
         run: ./gradlew clean build -x test --no-daemon
-
-  frontend-build:
-    name: Frontend Build
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: frontend
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build frontend
-        run: npm run build
