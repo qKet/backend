@@ -10,8 +10,24 @@
          parameterType  :  PaymentDTO
     -->
     <insert id="save" parameterType="PaymentDTO" useGeneratedKeys="true" keyProperty="paymentId">
-        INSERT INTO PAYMENTS (reservation_id, user_id, order_id, payment_key, amount, pay_status, approved_at, ins_id, ins_ip)
-        VALUES (#{reservationId}, #{userId}, #{orderId}, #{paymentKey}, #{amount}, #{payStatus}, #{approvedAt}, #{insId}, #{insIp})
+        INSERT INTO PAYMENTS (  reservation_id,
+                                user_id,
+                                order_id,
+                                payment_key,
+                                amount,
+                                pay_status,
+                                approved_at,
+                                ins_id,
+                                ins_ip)
+        VALUES (#{reservationId},
+                #{userId},
+                #{orderId},
+                #{paymentKey},
+                #{amount},
+                #{payStatus},
+                #{approvedAt},
+                #{insId},
+                #{insIp})
     </insert>
 
     <!--

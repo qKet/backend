@@ -29,8 +29,18 @@
          parameterType  :  ProgramDTO
     -->
     <insert id="save" parameterType="ProgramDTO" useGeneratedKeys="true" keyProperty="programId">
-        INSERT INTO PROGRAMS (program_nm, url_path, program_type, use_yn, ins_id, ins_ip)
-        VALUES (#{programNm}, #{urlPath}, #{programType}, COALESCE(#{useYn}, 'Y'), #{insId}, #{insIp})
+        INSERT INTO PROGRAMS (program_nm,
+                              url_path,
+                              program_type,
+                              use_yn,
+                              ins_id,
+                              ins_ip)
+            VALUES (#{programNm},
+                    #{urlPath},
+                    #{programType},
+                    COALESCE(#{useYn}, 'Y'),
+                    #{insId},
+                    #{insIp})
     </insert>
 
     <!--
@@ -57,7 +67,8 @@
          parameterType  :  long
     -->
     <delete id="deleteProgram" parameterType="long">
-        DELETE FROM PROGRAMS WHERE program_id = #{programId}
+        DELETE FROM PROGRAMS
+        WHERE program_id = #{programId}
     </delete>
 
     <!--
@@ -67,10 +78,10 @@
     -->
     <select id="findAllRolePrograms" resultType="RoleProgramDTO">
         SELECT role_id AS roleId, 
-                      program_id AS programId,
-                      use_yn AS useYn,
-                      upt_id AS uptId,
-                      upt_de AS uptDe
+               program_id AS programId,
+               use_yn AS useYn,
+               upt_id AS uptId,
+               upt_de AS uptDe
         FROM ROLE_PROGRAMS
         ORDER BY program_id, role_id
     </select>
@@ -81,7 +92,8 @@
          parameterType  :  long
     -->
     <delete id="deleteRoleProgramsByProgramId" parameterType="long">
-        DELETE FROM ROLE_PROGRAMS WHERE program_id = #{programId}
+        DELETE FROM ROLE_PROGRAMS
+        WHERE program_id = #{programId}
     </delete>
 
     <!--
@@ -93,9 +105,9 @@
     <update id="updateRoleProgramUseYn" parameterType="RoleProgramDTO">
         UPDATE ROLE_PROGRAMS
         SET use_yn = #{useYn},
-                upt_id = #{uptId},
-                upt_ip = #{uptIp},
-                upt_de = NOW()
+            upt_id = #{uptId},
+            upt_ip = #{uptIp},
+            upt_de = NOW()
         WHERE role_id = #{roleId} AND program_id = #{programId}
     </update>
 
@@ -105,22 +117,22 @@
          parameterType  :  RoleProgramDTO
     -->
     <insert id="saveRoleProgram" parameterType="RoleProgramDTO">
-        INSERT INTO ROLE_PROGRAMS (role_id,
-                                                                  program_id,
-                                                                  use_yn,
-                                                                  ins_id,
-                                                                  ins_ip,
-                                                                  upt_id,
-                                                                  upt_ip,
-                                                                  upt_de)
+        INSERT INTO ROLE_PROGRAMS ( role_id,
+                                    program_id,
+                                    use_yn,
+                                    ins_id,
+                                    ins_ip,
+                                    upt_id,
+                                    upt_ip,
+                                    upt_de)
         VALUES (#{roleId},
-                        #{programId},
-                        'Y',
-                        #{insId},
-                        #{insIp},
-                        #{uptId},
-                        #{uptIp},
-                        NOW())
+                #{programId},
+                'Y',
+                #{insId},
+                #{insIp},
+                #{uptId},
+                #{uptIp},
+                NOW())
     </insert>
 
 </mapper>
