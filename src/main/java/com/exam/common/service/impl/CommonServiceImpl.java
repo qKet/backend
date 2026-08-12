@@ -1,7 +1,8 @@
-package com.exam.common.service;
+package com.exam.common.service.impl;
 
 import com.exam.common.exception.BusinessException;
 import com.exam.common.exception.ErrorCode;
+import com.exam.common.service.CommonService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

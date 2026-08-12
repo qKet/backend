@@ -1,10 +1,11 @@
-package com.exam.queue.service;
+package com.exam.queue.service.impl;
 
 import com.exam.queue.domain.QueueStatus;
 import com.exam.queue.domain.QueueTokenInfo;
 import com.exam.queue.dto.QueueJoinResponse;
 import com.exam.queue.dto.QueueStatusResponse;
 import com.exam.queue.repository.RedisQueueRepository;
+import com.exam.queue.service.QueueService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
