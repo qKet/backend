@@ -105,7 +105,14 @@
          parameterType  :  RoleProgramDTO
     -->
     <insert id="saveRoleProgram" parameterType="RoleProgramDTO">
-        INSERT INTO ROLE_PROGRAMS (role_id, program_id, use_yn, ins_id, ins_ip, upt_id, upt_ip, upt_de)
+        INSERT INTO ROLE_PROGRAMS (role_id,
+                                                                  program_id,
+                                                                  use_yn,
+                                                                  ins_id,
+                                                                  ins_ip,
+                                                                  upt_id,
+                                                                  upt_ip,
+                                                                  upt_de)
         VALUES (#{roleId}, #{programId}, 'Y', #{insId}, #{insIp}, #{uptId}, #{uptIp}, NOW())
     </insert>
 
