@@ -66,7 +66,11 @@
          resultType     :  RoleProgramDTO
     -->
     <select id="findAllRolePrograms" resultType="RoleProgramDTO">
-        SELECT role_id AS roleId, program_id AS programId, use_yn AS useYn, upt_id AS uptId, upt_de AS uptDe
+        SELECT role_id AS roleId, 
+                      program_id AS programId,
+                      use_yn AS useYn,
+                      upt_id AS uptId,
+                      upt_de AS uptDe
         FROM ROLE_PROGRAMS
         ORDER BY program_id, role_id
     </select>
