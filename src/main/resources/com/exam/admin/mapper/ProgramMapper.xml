@@ -92,7 +92,10 @@
     -->
     <update id="updateRoleProgramUseYn" parameterType="RoleProgramDTO">
         UPDATE ROLE_PROGRAMS
-        SET use_yn = #{useYn}, upt_id = #{uptId}, upt_ip = #{uptIp}, upt_de = NOW()
+        SET use_yn = #{useYn},
+                upt_id = #{uptId},
+                upt_ip = #{uptIp},
+                upt_de = NOW()
         WHERE role_id = #{roleId} AND program_id = #{programId}
     </update>
 
