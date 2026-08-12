@@ -15,6 +15,8 @@
                url_path       AS urlPath,
                program_type   AS programType,
                use_yn         AS useYn,
+               ins_id         AS insId,
+               ins_de         AS insDe,
                upt_id         AS uptId,
                upt_de         AS uptDe
         FROM PROGRAMS
