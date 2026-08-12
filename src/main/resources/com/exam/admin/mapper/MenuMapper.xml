@@ -18,6 +18,8 @@
                m.menu_nm        AS menuNm,
                m.sort_order     AS sortOrder,
                m.use_yn         AS useYn,
+               m.ins_id         AS insId,
+               m.ins_de         AS insDe,
                m.upt_id         AS uptId,
                m.upt_de         AS uptDe
         FROM MENUS m
@@ -100,7 +102,7 @@
                 m.program_id IS NULL
                 OR EXISTS (
                     SELECT 1 FROM ROLE_PROGRAMS rp
-                    WHERE rp.program_id = m.program_id AND rp.role_id = #{roleId}
+                    WHERE rp.program_id = m.program_id AND rp.role_id = #{roleId} AND rp.use_yn = 'Y'
                 )
               )
         ORDER BY m.sort_order, m.menu_id
