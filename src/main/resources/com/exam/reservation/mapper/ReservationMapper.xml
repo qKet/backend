@@ -29,8 +29,20 @@
          parameterType  :  ReservationDTO
     -->
     <insert id="insertHistory" parameterType="ReservationDTO">
-        INSERT INTO RESERVATION_HISTORY (user_id, seat_id, round_id, performance_id, action, ins_id, ins_ip)
-        SELECT #{userId}, #{seatId}, #{roundId}, performance_id, #{action}, #{insId}, #{insIp}
+        INSERT INTO RESERVATION_HISTORY (user_id,
+                                         seat_id,
+                                         round_id,
+                                         performance_id,
+                                         action,
+                                         ins_id,
+                                         ins_ip)
+        SELECT #{userId},
+               #{seatId},
+               #{roundId},
+               performance_id,
+               #{action},
+               #{insId},
+               #{insIp}
         FROM PERFORMANCE_ROUND
         WHERE round_id = #{roundId}
     </insert>

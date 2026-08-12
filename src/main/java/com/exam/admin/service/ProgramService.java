@@ -12,5 +12,5 @@ public interface ProgramService {
     void deleteProgram(Long programId);
 
     List<RoleProgramDTO> getRolePrograms();
-    void updateRolePrograms(List<RoleProgramDTO> rolePrograms);
+    void updateRolePrograms(List<RoleProgramDTO> rolePrograms, String uptId, String uptIp);
 }

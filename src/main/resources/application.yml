@@ -82,4 +82,4 @@ oauth:
 # 토스페이먼츠 시크릿 키 — 기본값은 토스 공식 위젯 연동 가이드에 공개된 테스트 전용 키
 # (frontend/.env.local 의 NEXT_PUBLIC_TOSS_CLIENT_KEY=test_gck_docs_... 와 짝을 이루는 시크릿 키)
 toss:
-  secret-key: ${TOSS_SECRET_KEY:test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6}
+  secret-key: ${TOSS_SECRET_KEY:}
