@@ -20,7 +20,8 @@
         FROM RESERVATIONS r
         JOIN SEATS s ON r.seat_id = s.seat_id
         WHERE r.round_id = #{roundId}
-        ORDER BY s.seat_row, s.seat_colume
+        ORDER BY s.seat_row,
+                 s.seat_colume
     </select>
 
     <!--
