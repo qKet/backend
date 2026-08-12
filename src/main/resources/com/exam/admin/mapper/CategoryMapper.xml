@@ -28,7 +28,11 @@
         SELECT category_id AS categoryId,
                category_nm AS categoryNm,
                sort_order  AS sortOrder,
-               use_yn      AS useYn
+               use_yn      AS useYn,
+               ins_id      AS insId,
+               ins_de      AS insDe,
+               upt_id      AS uptId,
+               upt_de      AS uptDe
         FROM CATEGORIES
         ORDER BY sort_order, category_id
     </select>

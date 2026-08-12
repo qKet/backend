@@ -237,6 +237,7 @@ CREATE TABLE IF NOT EXISTS PROGRAMS (
 CREATE TABLE IF NOT EXISTS ROLE_PROGRAMS (
     role_id BIGINT NOT NULL,
     program_id BIGINT NOT NULL,
+    use_yn CHAR(1) NOT NULL DEFAULT 'Y', -- 체크 해제 시 행을 지우지 않고 'N'으로만 바꿔서 최종수정자/일 기록을 보존(소프트 삭제)
 
     ins_id VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
     ins_ip VARCHAR(45) NULL,

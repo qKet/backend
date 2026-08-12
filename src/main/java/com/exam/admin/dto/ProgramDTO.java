@@ -14,9 +14,10 @@ public class ProgramDTO {
     private String programType; // MENU / PAGE
     private String useYn;
 
-    // 감사(audit) 컬럼 — 등록자/수정자 ID·IP
+    // 감사(audit) 컬럼 — 등록자/수정자 ID·IP·일시
     private String insId;
     private String insIp;
+    private LocalDateTime insDe;
     private String uptId;
     private String uptIp;
     private LocalDateTime uptDe;
