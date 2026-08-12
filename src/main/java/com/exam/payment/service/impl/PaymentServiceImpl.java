@@ -1,10 +1,11 @@
-package com.exam.payment.service;
+package com.exam.payment.service.impl;
 
 import com.exam.common.exception.BusinessException;
 import com.exam.common.exception.ErrorCode;
 import com.exam.payment.dto.PaymentConfirmRequestDTO;
 import com.exam.payment.dto.PaymentDTO;
 import com.exam.payment.mapper.PaymentMapper;
+import com.exam.payment.service.PaymentService;
 import com.exam.reservation.dto.SeatDTO;
 import com.exam.reservation.mapper.SeatMapper;
 import com.exam.reservation.service.ReservationService;

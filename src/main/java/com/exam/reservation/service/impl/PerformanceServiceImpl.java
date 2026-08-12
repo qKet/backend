@@ -1,4 +1,4 @@
-package com.exam.reservation.service;
+package com.exam.reservation.service.impl;
 
 import com.exam.common.dto.PageResponse;
 import com.exam.common.exception.BusinessException;
@@ -6,6 +6,7 @@ import com.exam.common.exception.ErrorCode;
 import com.exam.reservation.dto.PerformanceDTO;
 import com.exam.reservation.dto.RoundDTO;
 import com.exam.reservation.mapper.PerformanceMapper;
+import com.exam.reservation.service.PerformanceService;
 import org.springframework.stereotype.Service;
 
 
