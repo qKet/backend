@@ -113,7 +113,14 @@
                                                                   upt_id,
                                                                   upt_ip,
                                                                   upt_de)
-        VALUES (#{roleId}, #{programId}, 'Y', #{insId}, #{insIp}, #{uptId}, #{uptIp}, NOW())
+        VALUES (#{roleId},
+                        #{programId},
+                        'Y',
+                        #{insId},
+                        #{insIp},
+                        #{uptId},
+                        #{uptIp},
+                        NOW())
     </insert>
 
 </mapper>
