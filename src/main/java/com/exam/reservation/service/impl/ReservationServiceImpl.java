@@ -1,8 +1,9 @@
-package com.exam.reservation.service;
+package com.exam.reservation.service.impl;
 
 import com.exam.queue.service.QueueService;
 import com.exam.reservation.dto.ReservationDTO;
 import com.exam.reservation.mapper.ReservationMapper;
+import com.exam.reservation.service.ReservationService;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
