@@ -15,6 +15,8 @@
                url_path       AS urlPath,
                program_type   AS programType,
                use_yn         AS useYn,
+               ins_id         AS insId,
+               ins_de         AS insDe,
                upt_id         AS uptId,
                upt_de         AS uptDe
         FROM PROGRAMS
@@ -64,14 +66,18 @@
          resultType     :  RoleProgramDTO
     -->
     <select id="findAllRolePrograms" resultType="RoleProgramDTO">
-        SELECT role_id AS roleId, program_id AS programId
+        SELECT role_id AS roleId, 
+                      program_id AS programId,
+                      use_yn AS useYn,
+                      upt_id AS uptId,
+                      upt_de AS uptDe
         FROM ROLE_PROGRAMS
         ORDER BY program_id, role_id
     </select>
 
     <!--
          이름            :  deleteRoleProgramsByProgramId
-         기능            :  특정 프로그램의 역할 매핑 전부 삭제 — deleteProgram에서 FK 정리용으로 먼저 호출
+         기능            :  특정 프로그램의 역할 매핑 전부 삭제 — deleteProgram에서 FK 정리용으로 먼저 호출(프로그램 자체가 없어지므로 소프트 삭제 대상 아님)
          parameterType  :  long
     -->
     <delete id="deleteRoleProgramsByProgramId" parameterType="long">
@@ -79,21 +85,42 @@
     </delete>
 
     <!--
-         이름            :  deleteAllRolePrograms
-         기능            :  역할-프로그램 매핑 전체 삭제 — ProgramServiceImpl.updateRolePrograms에서 그리드 저장 시 통째로 교체하기 위한 초기화(체크 상태 = 전체 최종 상태 전제)
+         이름            :  updateRoleProgramUseYn
+         기능            :  기존 역할-프로그램 매핑의 체크 상태 변경 — updateRolePrograms에서 체크 해제(Y→N)/재체크(N→Y) 시 사용.
+                            행을 지우지 않고 use_yn만 바꿔서 최종수정자/수정일이 남도록 함(소프트 삭제)
+         parameterType  :  RoleProgramDTO
     -->
-    <delete id="deleteAllRolePrograms">
-        DELETE FROM ROLE_PROGRAMS
-    </delete>
+    <update id="updateRoleProgramUseYn" parameterType="RoleProgramDTO">
+        UPDATE ROLE_PROGRAMS
+        SET use_yn = #{useYn},
+                upt_id = #{uptId},
+                upt_ip = #{uptIp},
+                upt_de = NOW()
+        WHERE role_id = #{roleId} AND program_id = #{programId}
+    </update>
 
     <!--
          이름            :  saveRoleProgram
-         기능            :  역할-프로그램 매핑 저장 — updateRolePrograms에서 deleteAllRolePrograms 후 그리드에 체크된 항목만 재삽입
+         기능            :  역할-프로그램 매핑 신규 저장 — updateRolePrograms에서 이전에 존재한 적 없는 조합만 삽입
          parameterType  :  RoleProgramDTO
     -->
     <insert id="saveRoleProgram" parameterType="RoleProgramDTO">
-        INSERT INTO ROLE_PROGRAMS (role_id, program_id, ins_id, ins_ip)
-        VALUES (#{roleId}, #{programId}, #{insId}, #{insIp})
+        INSERT INTO ROLE_PROGRAMS (role_id,
+                                                                  program_id,
+                                                                  use_yn,
+                                                                  ins_id,
+                                                                  ins_ip,
+                                                                  upt_id,
+                                                                  upt_ip,
+                                                                  upt_de)
+        VALUES (#{roleId},
+                        #{programId},
+                        'Y',
+                        #{insId},
+                        #{insIp},
+                        #{uptId},
+                        #{uptIp},
+                        NOW())
     </insert>
 
 </mapper>
