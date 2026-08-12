@@ -31,8 +31,20 @@
          parameterType  :  MenuDTO
     -->
     <insert id="save" parameterType="MenuDTO" useGeneratedKeys="true" keyProperty="menuId">
-        INSERT INTO MENUS (program_id, parent_menu_id, menu_nm, sort_order, use_yn, ins_id, ins_ip)
-        VALUES (#{programId}, #{parentMenuId}, #{menuNm}, COALESCE(#{sortOrder}, 0), COALESCE(#{useYn}, 'Y'), #{insId}, #{insIp})
+        INSERT INTO MENUS ( program_id,
+                            parent_menu_id,
+                            menu_nm,
+                            sort_order,
+                            use_yn,
+                            ins_id,
+                            ins_ip)
+        VALUES (#{programId},
+                #{parentMenuId},
+                #{menuNm},
+                COALESCE(#{sortOrder}, 0),
+                COALESCE(#{useYn}, 'Y'),
+                #{insId},
+                #{insIp})
     </insert>
 
     <!--
@@ -62,7 +74,8 @@
          parameterType  :  long
     -->
     <delete id="deleteMenu" parameterType="long">
-        DELETE FROM MENUS WHERE menu_id = #{menuId}
+        DELETE FROM MENUS
+        WHERE menu_id = #{menuId}
     </delete>
 
     <!--

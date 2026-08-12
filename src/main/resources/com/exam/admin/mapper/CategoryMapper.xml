@@ -43,7 +43,9 @@
          resultType     :  boolean
     -->
     <select id="existsByName" resultType="boolean">
-        SELECT COUNT(*) > 0 FROM CATEGORIES WHERE category_nm = #{categoryNm}
+        SELECT COUNT(*) > 0
+        FROM CATEGORIES
+        WHERE category_nm = #{categoryNm}
     </select>
 
     <!--
@@ -52,7 +54,10 @@
          resultType     :  boolean
     -->
     <select id="existsByNameExcludingId" resultType="boolean">
-        SELECT COUNT(*) > 0 FROM CATEGORIES WHERE category_nm = #{categoryNm} AND category_id != #{categoryId}
+        SELECT COUNT(*) > 0
+        FROM CATEGORIES
+        WHERE category_nm = #{categoryNm}
+          AND category_id != #{categoryId}
     </select>
 
     <!--
@@ -65,13 +70,16 @@
          MySQL은 INSERT 대상 테이블을 서브쿼리 FROM에 직접 쓰지 못하게 막아서(파생 테이블 트릭 필요)
          한 번 더 SELECT ... FROM (...) AS t 로 감싸야 함 -->
     <insert id="save" parameterType="CategoryDTO" useGeneratedKeys="true" keyProperty="categoryId">
-        INSERT INTO CATEGORIES (category_nm, sort_order, use_yn, ins_id, ins_ip)
-        VALUES (
-            #{categoryNm},
-            COALESCE(#{sortOrder}, (SELECT next_order FROM (SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM CATEGORIES) AS t)),
-            COALESCE(#{useYn}, 'Y'),
-            #{insId}, #{insIp}
-        )
+        INSERT INTO CATEGORIES (category_nm,
+                                sort_order,
+                                use_yn,
+                                ins_id,
+                                ins_ip)
+        VALUES (#{categoryNm},
+                COALESCE(#{sortOrder}, (SELECT next_order FROM (SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM CATEGORIES) AS t)),
+                COALESCE(#{useYn}, 'Y'),
+                #{insId},
+                #{insIp})
     </insert>
 
     <!--
@@ -97,7 +105,9 @@
          resultType     :  boolean
     -->
     <select id="hasLinkedPerformances" resultType="boolean">
-        SELECT COUNT(*) > 0 FROM PERFORMANCES WHERE category_id = #{categoryId}
+        SELECT COUNT(*) > 0
+        FROM PERFORMANCES
+        WHERE category_id = #{categoryId}
     </select>
 
     <!--
@@ -105,7 +115,8 @@
          기능            :  카테고리 삭제 — hasLinkedPerformances로 연결 공연 없음을 미리 확인한 뒤에만 호출됨
     -->
     <delete id="deleteCategory">
-        DELETE FROM CATEGORIES WHERE category_id = #{categoryId}
+        DELETE FROM CATEGORIES
+        WHERE category_id = #{categoryId}
     </delete>
 
 </mapper>
