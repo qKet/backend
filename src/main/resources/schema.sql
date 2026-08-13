@@ -215,13 +215,16 @@ CREATE TABLE IF NOT EXISTS RESERVATION_HISTORY (
     FOREIGN KEY (performance_id) REFERENCES PERFORMANCES(performance_id)
 );
 
--- CANCEL_ALERTS: NOTI01_ALERT01(공연 취소표 알림) — 회차 단위 구독. use_yn 토글로 켜고 끔(행 자체는 안 지움)
+-- OPEN_ALERTS: 예매 오픈 알림 — 회차 단위 구독. use_yn 토글로 켜고 끔(행 자체는 안 지움)
 -- 같은 회차를 여러 번 눌러도(구독 취소 후 재구독 등) 행이 늘어나지 않게 (user_id, round_id) 유니크 + UPSERT로 처리
-CREATE TABLE IF NOT EXISTS CANCEL_ALERTS (
+-- notified_yn: NotificationServiceImpl의 5분 주기 스케줄러가 "open_time 30분 전" 발송을 이미 했는지 표시
+--   (스케줄러가 5분마다 도는데 표시가 없으면 같은 구독자한테 여러 번 중복 발송될 수 있어서 필요)
+CREATE TABLE IF NOT EXISTS OPEN_ALERTS (
     alert_id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(50) NOT NULL,
     round_id BIGINT NOT NULL,
     use_yn CHAR(1) NOT NULL DEFAULT 'Y',
+    notified_yn CHAR(1) NOT NULL DEFAULT 'N',
 
     ins_id VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
     ins_ip VARCHAR(45) NULL,
@@ -232,7 +235,7 @@ CREATE TABLE IF NOT EXISTS CANCEL_ALERTS (
 
     FOREIGN KEY (user_id) REFERENCES USERS (user_id),
     FOREIGN KEY (round_id) REFERENCES PERFORMANCE_ROUND (round_id),
-    UNIQUE KEY uk_cancel_alerts_user_round (user_id, round_id)
+    UNIQUE KEY uk_open_alerts_user_round (user_id, round_id)
 );
 
 -- PROGRAMS: 프로그램관리 — 프론트 화면(라우트) 등록. program_type: 'MENU'(네비게이션에 노출) / 'PAGE'(URL 접근만, 메뉴 미노출)

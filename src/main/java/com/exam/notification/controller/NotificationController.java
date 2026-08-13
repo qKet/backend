@@ -9,9 +9,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 
-// NOTI01_ALERT01(공연 취소표 알림) — 회차 단위 구독 토글. 좌석 페이지의 "취소표 알림받기" 버튼이 호출
+// 예매 오픈 알림 — 회차 단위 구독 토글. 공연 상세페이지의 회차별 "예매 오픈 알림 신청" 버튼이 호출
 @RestController
-@RequestMapping("/notifications/cancel-alerts")
+@RequestMapping("/notifications/open-alerts")
 public class NotificationController {
 
     private final NotificationService notificationService;
@@ -29,9 +29,9 @@ public class NotificationController {
     }
 
     /***********************************
-     *  URL      :   "/notifications/cancel-alerts/{roundId}"
+     *  URL      :   "/notifications/open-alerts/{roundId}"
      *  이름      :   구독 상태 조회
-     *  기능      :   로그인 사용자가 해당 회차 취소표 알림을 구독 중인지 조회 — 좌석 페이지 진입 시 버튼 초기 상태용
+     *  기능      :   로그인 사용자가 해당 회차 예매 오픈 알림을 구독 중인지 조회 — 공연 상세페이지 버튼 초기 상태용
      *  method   :   Get
      *  param    :   Long roundId, HttpSession
      *  return   :   boolean
@@ -43,9 +43,9 @@ public class NotificationController {
     }
 
     /***********************************
-     *  URL      :   "/notifications/cancel-alerts/{roundId}"
+     *  URL      :   "/notifications/open-alerts/{roundId}"
      *  이름      :   구독 켜기
-     *  기능      :   해당 회차 취소표 알림 구독을 켬
+     *  기능      :   해당 회차 예매 오픈 알림 구독을 켬
      *  method   :   Post
      *  param    :   Long roundId, HttpSession, HttpServletRequest
      *  return   :   boolean
@@ -58,9 +58,9 @@ public class NotificationController {
     }
 
     /***********************************
-     *  URL      :   "/notifications/cancel-alerts/{roundId}"
+     *  URL      :   "/notifications/open-alerts/{roundId}"
      *  이름      :   구독 끄기
-     *  기능      :   해당 회차 취소표 알림 구독을 끔
+     *  기능      :   해당 회차 예매 오픈 알림 구독을 끔
      *  method   :   Delete
      *  param    :   Long roundId, HttpSession, HttpServletRequest
      *  return   :   boolean

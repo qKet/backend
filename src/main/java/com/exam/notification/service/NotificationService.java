@@ -8,7 +8,7 @@ public interface NotificationService {
 
     void unsubscribe(String userId, Long roundId, String clientIp);
 
-    // 취소 발생 시 해당 회차 구독자 전원한테 SQS로 알림 메시지 publish. best-effort — 실패해도 예외를 던지지 않음
-    // (호출부인 ReservationServiceImpl.cancel()의 예매취소 트랜잭션이 알림 실패로 롤백되면 안 되기 때문)
-    void publishCancelAlerts(Long roundId);
+    // 5분마다 스케줄러가 호출 — open_time이 임박(기본 30분 이내)한 미발송 구독을 찾아 SQS로 publish.
+    // best-effort — 한 건이 실패해도 나머지 건 발송을 막지 않음
+    void sweepOpenAlerts();
 }

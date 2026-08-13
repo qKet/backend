@@ -3,10 +3,10 @@ package com.exam.notification.dto;
 import lombok.Data;
 import org.apache.ibatis.type.Alias;
 
-// CANCEL_ALERTS 행 자체 — 구독 토글(subscribe/unsubscribe)용
+// OPEN_ALERTS 행 자체 — 구독 토글(subscribe/unsubscribe)용
 @Data
-@Alias("CancelAlertDTO")
-public class CancelAlertDTO {
+@Alias("OpenAlertDTO")
+public class OpenAlertDTO {
 
     private Long alertId;
     private String userId;
