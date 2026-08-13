@@ -14,9 +14,17 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:1234}
     hikari:
-      # 기본값(10)은 부하테스트 시 동시 요청이 몰리면 금방 병목이 되어서 상향 조정
+      # 2026-08-13: replica × pool size 총합이 db.t3.micro의 max_connections(~85)를 훌쩍 넘겨서
+      # (8대 × 40 = 320) 커넥션 "생성" 자체가 병목이 되는 걸 실측으로 확인(HikariCP pending 급증,
+      # 정작 RDS CPU는 9%로 한가함 — DB가 못 받아준 게 아니라 못 만들어준 것). 이후로는
+      # "replica 수 × 이 값"이 RDS 상한 안에 여유 있게 들어오도록 배포 쪽(CD 레포)에서 관리.
       maximum-pool-size: ${DB_POOL_SIZE:20}
-      minimum-idle: 5
+      # max와 동일하게 — 트래픽 몰릴 때 그제서야 새 커넥션을 만드는 대신, 파드 시작 시점에
+      # 미리 다 열어둬서 "커넥션 생성 폭주"(위 사고 원인) 자체를 없앰
+      minimum-idle: ${DB_POOL_SIZE:20}
+      # 3초 안에 풀에서 커넥션을 못 받으면 빠르게 실패 — 기본값(30초)만큼 요청이 pending으로
+      # 쌓여있다가 뒤늦게 타임아웃되는 것보다, 빨리 실패해서 사용자가 재시도하는 게 낫다고 판단
+      connection-timeout: 3000
 
   sql:
     init:
