@@ -55,7 +55,7 @@ cloud:
     cloudfront:
       domain: ${CLOUDFRONT_DOMAIN:}
     sqs:
-      cancel-alert-queue-url: ${CANCEL_ALERT_QUEUE_URL:}
+      open-alert-queue-url: ${OPEN_ALERT_QUEUE_URL:}
 
 # mybatis
 mybatis:

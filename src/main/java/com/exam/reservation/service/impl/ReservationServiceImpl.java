@@ -1,6 +1,5 @@
 package com.exam.reservation.service.impl;
 
-import com.exam.notification.service.NotificationService;
 import com.exam.queue.service.QueueService;
 import com.exam.reservation.dto.ReservationDTO;
 import com.exam.reservation.mapper.ReservationMapper;
@@ -24,16 +23,13 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationMapper reservationMapper;
     private final RedissonClient redissonClient;
     private final QueueService queueService;
-    private final NotificationService notificationService;
 
     public ReservationServiceImpl(ReservationMapper reservationMapper,
                                   RedissonClient redissonClient,
-                                  QueueService queueService,
-                                  NotificationService notificationService) {
+                                  QueueService queueService) {
         this.reservationMapper = reservationMapper;
         this.redissonClient = redissonClient;
         this.queueService = queueService;
-        this.notificationService = notificationService;
     }
 
     @Override
@@ -152,9 +148,6 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setInsId(userId);
         reservation.setInsIp(clientIp);
         reservationMapper.insertHistory(reservation);
-
-        // NOTI01_ALERT01: 이 회차 취소표 알림 구독자한테 통지 (best-effort, 실패해도 취소 자체엔 영향 없음)
-        notificationService.publishCancelAlerts(reservation.getRoundId());
 
         return Map.of("success", true, "message", "예매가 취소되었습니다.");
     }

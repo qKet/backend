@@ -7,7 +7,7 @@ import com.exam.common.util.WebUtil;
 import com.exam.reservation.dto.PerformanceDTO;
 import com.exam.reservation.dto.RoundDTO;
 import com.exam.reservation.dto.VenueDTO;
-import com.exam.notification.mapper.CancelAlertMapper;
+import com.exam.notification.mapper.OpenAlertMapper;
 import com.exam.reservation.mapper.PerformanceMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -27,11 +27,11 @@ import java.util.Map;
 public class AdminPerformanceController {
 
     private final PerformanceMapper performanceMapper;
-    private final CancelAlertMapper cancelAlertMapper;
+    private final OpenAlertMapper openAlertMapper;
 
-    public AdminPerformanceController(PerformanceMapper performanceMapper, CancelAlertMapper cancelAlertMapper) {
+    public AdminPerformanceController(PerformanceMapper performanceMapper, OpenAlertMapper openAlertMapper) {
         this.performanceMapper = performanceMapper;
-        this.cancelAlertMapper = cancelAlertMapper;
+        this.openAlertMapper = openAlertMapper;
     }
 
     private UserDTO getLoginUser(HttpSession session) {
@@ -137,7 +137,7 @@ public class AdminPerformanceController {
             throw new BusinessException(ErrorCode.ROUND_ALREADY_OPEN, "예매 오픈된 회차가 있어 삭제할 수 없습니다.");
         performanceMapper.deleteReservationHistoryByPerformanceId(performanceId);
         performanceMapper.deleteReservationsByPerformanceId(performanceId);
-        cancelAlertMapper.deleteByPerformanceId(performanceId); // round_id FK라 회차 삭제 전에 먼저 정리
+        openAlertMapper.deleteByPerformanceId(performanceId); // round_id FK라 회차 삭제 전에 먼저 정리
         performanceMapper.deleteRoundsByPerformanceId(performanceId);
         performanceMapper.deletePerformance(performanceId);
         return Map.of("success", true);
@@ -186,7 +186,7 @@ public class AdminPerformanceController {
             throw new BusinessException(ErrorCode.ROUND_ALREADY_OPEN, "예매 오픈된 회차는 삭제할 수 없습니다.");
         performanceMapper.deleteReservationHistoryByRoundId(roundId);
         performanceMapper.deleteReservationsByRoundId(roundId);
-        cancelAlertMapper.deleteByRoundId(roundId); // round_id FK라 회차 삭제 전에 먼저 정리
+        openAlertMapper.deleteByRoundId(roundId); // round_id FK라 회차 삭제 전에 먼저 정리
         performanceMapper.deleteRound(roundId);
         return Map.of("success", true);
     }
