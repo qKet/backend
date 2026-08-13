@@ -60,6 +60,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public int register(UserDTO userDTO) {
+        checkUserIdAvailable(userDTO.getUserId());
         if (!emailVerificationRepository.isVerified(userDTO.getUserEmail())) {
             throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
@@ -67,5 +68,17 @@ public class UserServiceImpl implements UserService {
         int result = userMapper.save(userDTO); // INSERT, DELETE ,UPDATE 의 결과를 저장 시 처리한 행 갯수를 가져옴
         emailVerificationRepository.clearVerified(userDTO.getUserEmail()); // 재사용 방지
         return result;
+    }
+
+    /***********************************
+     * 이름 : checkUserIdAvailable
+     * 기능 : 아이디 중복확인 — 프론트의 "중복확인" 버튼 + register() 직전 방어적 재확인 둘 다 여기로 옴
+     * param : String
+     ************************************/
+    @Override
+    public void checkUserIdAvailable(String userId) {
+        if (userMapper.findById(userId) != null) {
+            throw new BusinessException(ErrorCode.USER_ID_ALREADY_EXISTS);
+        }
     }
 }

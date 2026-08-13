@@ -39,6 +39,7 @@ public enum ErrorCode {
     EMAIL_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "A008", "인증번호가 만료되었습니다. 다시 요청해 주세요."),
     EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "A009", "이메일 인증을 완료해 주세요."),
     EMAIL_VERIFICATION_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "A010", "인증번호 발송에 실패했습니다. 잠시 후 다시 시도해 주세요."),
+    USER_ID_ALREADY_EXISTS(HttpStatus.CONFLICT, "A011", "이미 사용 중인 아이디입니다."),
 
     // Admin (AdminController)
     ADMIN_ONLY(HttpStatus.FORBIDDEN, "AD001", "관리자 권한이 필요합니다."),

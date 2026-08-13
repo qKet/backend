@@ -66,6 +66,20 @@ public class UserController {
     }
 
     /***********************************
+     *  URL      :  "/auth/check-id"
+     *  이름      :   아이디 중복확인
+     *  기능      :   회원가입 폼에서 "중복확인" 버튼 클릭 시 호출 — 이미 사용 중이면 A011 에러
+     *  method   :   GET
+     *  param    :   String userId
+     *  result   :   Map<String, Object>
+     ************************************/
+    @GetMapping("/check-id")
+    public Map<String, Object> checkUserId(@RequestParam String userId) {
+        userService.checkUserIdAvailable(userId);
+        return Map.of("success", true, "message", "사용 가능한 아이디입니다.");
+    }
+
+    /***********************************
      *  URL      :  "/auth/signup"
      *  이름      :   회원가입
      *  기능      :   회원가입 시킨다
