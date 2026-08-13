@@ -1,7 +1,8 @@
-package com.exam.auth.service;
+package com.exam.auth.service.impl;
 
 import com.exam.auth.mapper.UserMapper;
 import com.exam.auth.repository.EmailVerificationRepository;
+import com.exam.auth.service.EmailVerificationService;
 import com.exam.common.exception.BusinessException;
 import com.exam.common.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,10 +34,10 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     private final String queueUrl;
 
     public EmailVerificationServiceImpl(EmailVerificationRepository repository,
-                                         UserMapper userMapper,
-                                         SqsClient sqsClient,
-                                         ObjectMapper objectMapper,
-                                         @Value("${cloud.aws.sqs.notification-queue-url:}") String queueUrl) {
+            UserMapper userMapper,
+            SqsClient sqsClient,
+            ObjectMapper objectMapper,
+            @Value("${cloud.aws.sqs.notification-queue-url:}") String queueUrl) {
         this.repository = repository;
         this.userMapper = userMapper;
         this.sqsClient = sqsClient;
