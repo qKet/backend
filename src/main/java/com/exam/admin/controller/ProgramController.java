@@ -122,12 +122,7 @@ public class ProgramController {
         UserDTO loginUser = getLoginUser(session);
         if (!isAdmin(loginUser))
             throw new BusinessException(ErrorCode.ADMIN_ONLY);
-        String clientIp = WebUtil.getClientIp(request);
-        for (RoleProgramDTO rp : body) {
-            rp.setInsId(loginUser.getUserId());
-            rp.setInsIp(clientIp);
-        }
-        programService.updateRolePrograms(body);
+        programService.updateRolePrograms(body, loginUser.getUserId(), WebUtil.getClientIp(request));
         return Map.of("success", true);
     }
 }

@@ -29,8 +29,20 @@
          parameterType  :  ReservationDTO
     -->
     <insert id="insertHistory" parameterType="ReservationDTO">
-        INSERT INTO RESERVATION_HISTORY (user_id, seat_id, round_id, performance_id, action, ins_id, ins_ip)
-        SELECT #{userId}, #{seatId}, #{roundId}, performance_id, #{action}, #{insId}, #{insIp}
+        INSERT INTO RESERVATION_HISTORY (user_id,
+                                         seat_id,
+                                         round_id,
+                                         performance_id,
+                                         action,
+                                         ins_id,
+                                         ins_ip)
+        SELECT #{userId},
+               #{seatId},
+               #{roundId},
+               performance_id,
+               #{action},
+               #{insId},
+               #{insIp}
         FROM PERFORMANCE_ROUND
         WHERE round_id = #{roundId}
     </insert>
@@ -139,5 +151,23 @@
             upt_ip          = #{uptIp}
         WHERE reservation_id = #{reservationId}
     </update>
+
+    <!--
+         이름            :  findSeatDisplayInfo
+         기능            :  예매확정/취소 알림 메일용 표시정보(공연명/회차시각/좌석) 조회 — ReservationNotificationService가 씀.
+                            SEATS/PERFORMANCE_ROUND는 서로 FK로 안 이어져 있어 조인 조건이 아니라 각자 파라미터로 필터
+         resultType     :  SeatDisplayInfoDTO
+    -->
+    <select id="findSeatDisplayInfo" resultType="SeatDisplayInfoDTO">
+        SELECT s.seat_row    AS seatRow,
+               s.seat_colume AS seatColume,
+               s.grade       AS grade,
+               p.p_title     AS pTitle,
+               pr.round_time AS roundTime
+        FROM SEATS s
+        JOIN PERFORMANCE_ROUND pr ON pr.round_id = #{roundId}
+        JOIN PERFORMANCES p ON pr.performance_id = p.performance_id
+        WHERE s.seat_id = #{seatId}
+    </select>
 
 </mapper>

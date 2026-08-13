@@ -27,13 +27,29 @@
          parameterType  :  UserDTO
     -->
     <insert id="save" parameterType="UserDTO">
-        INSERT INTO USERS (user_id, user_nm, pwd, user_email, role_id, user_status, login_provider, provider_user_id, ins_id, ins_ip)
-        VALUES (#{userId}, #{userNm}, #{pwd}, #{userEmail}, 1, 'ACTIVE',
-        <choose>
-            <when test="loginProvider != null">#{loginProvider}</when>
-            <otherwise>'LOCAL'</otherwise>
-        </choose>,
-        #{providerUserId}, #{insId}, #{insIp})
+        INSERT INTO USERS ( user_id,
+                            user_nm,
+                            pwd,
+                            user_email,
+                            role_id,
+                            user_status,
+                            login_provider,
+                            provider_user_id,
+                            ins_id,
+                            ins_ip)
+        VALUES (#{userId},
+                #{userNm},
+                #{pwd},
+                #{userEmail},
+                1,
+                'ACTIVE',
+                <choose>
+                    <when test="loginProvider != null">#{loginProvider}</when>
+                    <otherwise>'LOCAL'</otherwise>
+                </choose>,
+                #{providerUserId},
+                #{insId},
+                #{insIp})
     </insert>
 
     <!-- 
@@ -98,7 +114,10 @@
          resultType     :  map
     -->
     <select id="findAllRoles" resultType="map">
-        SELECT role_id AS roleId, role_name AS roleName FROM ROLES ORDER BY role_id
+        SELECT role_id AS roleId,
+               role_name AS roleName
+        FROM ROLES
+        ORDER BY role_id
     </select>
 
     <!--
