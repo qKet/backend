@@ -2,6 +2,9 @@ package com.exam.auth.service;
 
 import com.exam.auth.dto.UserDTO;
 import com.exam.auth.mapper.UserMapper;
+import com.exam.auth.repository.EmailVerificationRepository;
+import com.exam.common.exception.BusinessException;
+import com.exam.common.exception.ErrorCode;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,10 +22,13 @@ public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationRepository emailVerificationRepository;
 
-    public UserServiceImpl(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserMapper userMapper, PasswordEncoder passwordEncoder,
+                            EmailVerificationRepository emailVerificationRepository) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
+        this.emailVerificationRepository = emailVerificationRepository;
     }
 
     /***********************************
@@ -52,7 +58,12 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public int register(UserDTO userDTO) {
+        if (!emailVerificationRepository.isVerified(userDTO.getUserEmail())) {
+            throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
+        }
         userDTO.setPwd(passwordEncoder.encode(userDTO.getPwd())); //암호화
-        return userMapper.save(userDTO); // INSERT, DELETE ,UPDATE 의 결과를 저장 시 처리한 행 갯수를 가져옴
+        int result = userMapper.save(userDTO); // INSERT, DELETE ,UPDATE 의 결과를 저장 시 처리한 행 갯수를 가져옴
+        emailVerificationRepository.clearVerified(userDTO.getUserEmail()); // 재사용 방지
+        return result;
     }
 }

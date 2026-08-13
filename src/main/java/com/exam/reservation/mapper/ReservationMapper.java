@@ -1,6 +1,7 @@
 package com.exam.reservation.mapper;
 
 import com.exam.reservation.dto.ReservationDTO;
+import com.exam.reservation.dto.SeatDisplayInfoDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,4 +16,5 @@ public interface ReservationMapper {
                                               @Param("userId") String userId, @Param("action") String action);
     ReservationDTO findById(Long reservationId);
     int cancel(@Param("reservationId") Long reservationId, @Param("uptId") String uptId, @Param("uptIp") String uptIp);
+    SeatDisplayInfoDTO findSeatDisplayInfo(@Param("seatId") Long seatId, @Param("roundId") Long roundId);
 }

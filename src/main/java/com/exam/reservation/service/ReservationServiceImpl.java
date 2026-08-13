@@ -1,5 +1,6 @@
 package com.exam.reservation.service;
 
+import com.exam.notification.service.ReservationNotificationService;
 import com.exam.queue.service.QueueService;
 import com.exam.reservation.dto.ReservationDTO;
 import com.exam.reservation.mapper.ReservationMapper;
@@ -22,13 +23,16 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationMapper reservationMapper;
     private final RedissonClient redissonClient;
     private final QueueService queueService;
+    private final ReservationNotificationService reservationNotificationService;
 
     public ReservationServiceImpl(ReservationMapper reservationMapper,
                                   RedissonClient redissonClient,
-                                  QueueService queueService) {
+                                  QueueService queueService,
+                                  ReservationNotificationService reservationNotificationService) {
         this.reservationMapper = reservationMapper;
         this.redissonClient = redissonClient;
         this.queueService = queueService;
+        this.reservationNotificationService = reservationNotificationService;
     }
 
     @Override
@@ -90,6 +94,7 @@ public class ReservationServiceImpl implements ReservationService {
                 }
             }
 
+            reservationNotificationService.notifyConfirmed(userId, seatId, roundId);
             return Map.of("success", true, "message", "예매가 완료되었습니다.");
         } finally {
             // isHeldByCurrentThread()로 먼저 확인하는 이유: TTL(10초)이 이미 만료돼서 다른 스레드가
@@ -148,6 +153,7 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setInsIp(clientIp);
         reservationMapper.insertHistory(reservation);
 
+        reservationNotificationService.notifyCancelled(userId, reservation.getSeatId(), reservation.getRoundId());
         return Map.of("success", true, "message", "예매가 취소되었습니다.");
     }
 }
