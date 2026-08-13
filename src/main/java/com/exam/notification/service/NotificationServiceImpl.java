@@ -1,12 +1,13 @@
 package com.exam.notification.service;
 
-import com.exam.notification.dto.CancelAlertDTO;
-import com.exam.notification.dto.CancelAlertRecipientDTO;
-import com.exam.notification.mapper.CancelAlertMapper;
+import com.exam.notification.dto.OpenAlertDTO;
+import com.exam.notification.dto.OpenAlertRecipientDTO;
+import com.exam.notification.mapper.OpenAlertMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import software.amazon.awssdk.services.sqs.SqsClient;
@@ -25,33 +26,37 @@ import java.util.Map;
 @Service
 public class NotificationServiceImpl implements NotificationService {
 
-    private final CancelAlertMapper cancelAlertMapper;
+    private final OpenAlertMapper openAlertMapper;
     private final SqsClient sqsClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${cloud.aws.sqs.cancel-alert-queue-url:}")
-    private String cancelAlertQueueUrl;
+    @Value("${cloud.aws.sqs.open-alert-queue-url:}")
+    private String openAlertQueueUrl;
 
-    public NotificationServiceImpl(CancelAlertMapper cancelAlertMapper, SqsClient sqsClient, ObjectMapper objectMapper) {
-        this.cancelAlertMapper = cancelAlertMapper;
+    // "예매 오픈 몇 분 전"에 보낼지 — 기본 30분. application.yml에서 바꿀 수 있게 열어둠
+    @Value("${notification.open-alert-minutes-before:30}")
+    private int minutesBefore;
+
+    public NotificationServiceImpl(OpenAlertMapper openAlertMapper, SqsClient sqsClient, ObjectMapper objectMapper) {
+        this.openAlertMapper = openAlertMapper;
         this.sqsClient = sqsClient;
         this.objectMapper = objectMapper;
     }
 
     /***********************************
      *  이름      :   isSubscribed
-     *  기능      :   로그인 사용자의 해당 회차 취소표 알림 구독 상태 조회
+     *  기능      :   로그인 사용자의 해당 회차 예매 오픈 알림 구독 상태 조회
      *  param    :   String userId, Long roundId
      *  return   :   boolean
      ************************************/
     @Override
     public boolean isSubscribed(String userId, Long roundId) {
-        return "Y".equals(cancelAlertMapper.findUseYn(userId, roundId));
+        return "Y".equals(openAlertMapper.findUseYn(userId, roundId));
     }
 
     /***********************************
      *  이름      :   subscribe
-     *  기능      :   취소표 알림 구독 켜기
+     *  기능      :   예매 오픈 알림 구독 켜기
      *  param    :   String userId, Long roundId, String clientIp
      ************************************/
     @Override
@@ -61,7 +66,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     /***********************************
      *  이름      :   unsubscribe
-     *  기능      :   취소표 알림 구독 끄기
+     *  기능      :   예매 오픈 알림 구독 끄기
      *  param    :   String userId, Long roundId, String clientIp
      ************************************/
     @Override
@@ -70,46 +75,58 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     private void upsert(String userId, Long roundId, String useYn, String clientIp) {
-        CancelAlertDTO dto = new CancelAlertDTO();
+        OpenAlertDTO dto = new OpenAlertDTO();
         dto.setUserId(userId);
         dto.setRoundId(roundId);
         dto.setUseYn(useYn);
         dto.setInsId(userId);
         dto.setInsIp(clientIp);
-        cancelAlertMapper.upsert(dto);
+        openAlertMapper.upsert(dto);
     }
 
     /***********************************
-     *  이름      :   publishCancelAlerts
-     *  기능      :   취소 발생 회차의 구독자 전원에게 SQS 메시지 publish(수신자당 1건) — Lambda가 이 큐를 구독해서 SES로 발송함.
-     *              큐 URL 미설정(로컬 등) 또는 publish 실패는 로그만 남기고 삼킴 — 예매 취소 자체를 막으면 안 됨
-     *  param    :   Long roundId
+     *  이름      :   sweepOpenAlerts
+     *  기능      :   5분마다 실행 — open_time이 임박한 미발송 구독을 찾아 SQS에 publish(구독 1건당 메시지 1건).
+     *              Lambda가 이 큐를 구독해서 SES로 발송함. 개별 건 실패는 로그만 남기고 삼킴 — 한 건 실패가
+     *              나머지 구독자 발송을 막으면 안 됨. 큐 URL 미설정(로컬 등)이면 실제 publish 대신 무엇을
+     *              보냈을지 로그로만 남김(dry-run) — notified_yn은 안 건드려서 나중에 큐가 생기면 그때 진짜 발송됨
      ************************************/
     @Override
-    public void publishCancelAlerts(Long roundId) {
-        if (!StringUtils.hasText(cancelAlertQueueUrl)) {
-            log.warn("CANCEL_ALERT_QUEUE_URL이 설정되지 않아 취소표 알림을 건너뜁니다. roundId={}", roundId);
+    @Scheduled(fixedRate = 5 * 60 * 1000)
+    public void sweepOpenAlerts() {
+        boolean queueConfigured = StringUtils.hasText(openAlertQueueUrl);
+        List<OpenAlertRecipientDTO> dueAlerts = openAlertMapper.findDueAlerts(minutesBefore);
+        if (dueAlerts.isEmpty()) {
             return;
         }
-        try {
-            List<CancelAlertRecipientDTO> recipients = cancelAlertMapper.findActiveSubscribersByRoundId(roundId);
-            for (CancelAlertRecipientDTO recipient : recipients) {
-                sqsClient.sendMessage(SendMessageRequest.builder()
-                        .queueUrl(cancelAlertQueueUrl)
-                        .messageBody(toMessageBody(recipient))
-                        .build());
+        if (!queueConfigured) {
+            log.warn("OPEN_ALERT_QUEUE_URL이 설정되지 않아 {}건을 실제 발송 없이 로그로만 남깁니다(dry-run).", dueAlerts.size());
+        }
+        for (OpenAlertRecipientDTO alert : dueAlerts) {
+            try {
+                String messageBody = toMessageBody(alert);
+                if (queueConfigured) {
+                    sqsClient.sendMessage(SendMessageRequest.builder()
+                            .queueUrl(openAlertQueueUrl)
+                            .messageBody(messageBody)
+                            .build());
+                    openAlertMapper.markNotified(alert.getAlertId());
+                } else {
+                    log.info("[DRY-RUN] 예매 오픈 알림 발송 대상: {}", messageBody);
+                }
+            } catch (Exception e) {
+                log.error("예매 오픈 알림 처리 실패. alertId={}", alert.getAlertId(), e);
             }
-        } catch (Exception e) {
-            log.error("취소표 알림 SQS publish 실패. roundId={}", roundId, e);
         }
     }
 
-    private String toMessageBody(CancelAlertRecipientDTO recipient) throws JsonProcessingException {
+    private String toMessageBody(OpenAlertRecipientDTO alert) throws JsonProcessingException {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("toEmail", recipient.getUserEmail());
-        payload.put("pTitle", recipient.getPTitle());
-        payload.put("venueName", recipient.getVenueName());
-        payload.put("roundTime", recipient.getRoundTime());
+        payload.put("toEmail", alert.getUserEmail());
+        payload.put("pTitle", alert.getPTitle());
+        payload.put("venueName", alert.getVenueName());
+        payload.put("openTime", alert.getOpenTime());
+        payload.put("roundTime", alert.getRoundTime());
         return objectMapper.writeValueAsString(payload);
     }
 }

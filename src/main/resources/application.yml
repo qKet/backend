@@ -59,8 +59,8 @@ cloud:
     sqs:
       # 회원가입 이메일 인증 + 예매확정/취소 알림이 공유(메시지의 type 필드로 Lambda가 구분)
       notification-queue-url: ${NOTIFICATION_QUEUE_URL:}
-      # 취소표 알림(NOTI01_ALERT01) 전용 — 위 큐와 별개
-      cancel-alert-queue-url: ${CANCEL_ALERT_QUEUE_URL:}
+      # 예매 오픈 알림 전용 — 위 큐와 별개
+      open-alert-queue-url: ${OPEN_ALERT_QUEUE_URL:}
 
 # mybatis
 mybatis:
