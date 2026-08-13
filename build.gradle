@@ -50,8 +50,12 @@ dependencies {
 	// IRSA(웹 아이덴티티 토큰)로 EKS 파드가 AWS 자격증명을 받으려면 sts 모듈이 클래스패스에 있어야 함
 	// (없으면 WebIdentityTokenCredentialsProvider가 조용히 스킵되고 다른 자격증명 방식들도 다 실패함)
 	implementation 'software.amazon.awssdk:sts'
-	// 취소표 알림(NOTI01_ALERT01) — cancel()이 SQS에 publish만 하고, 실제 이메일 발송은 Lambda가 SQS를 구독해서 처리
+	// 회원가입 이메일 인증번호/예매확정·취소 알림(notification-queue-url)과
+	// 취소표 알림(NOTI01_ALERT01, cancel-alert-queue-url) 발행용 — 큐는 서로 다르지만 SDK는 공유
 	implementation 'software.amazon.awssdk:sqs'
+
+	// SQS 메시지 body(JSON) 조립용 — 웹 스타터에 이미 포함돼 있지만 직접 의존성으로 명시
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
 }
 
 tasks.named('test') {

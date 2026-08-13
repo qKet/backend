@@ -1,6 +1,7 @@
 package com.exam.reservation.service.impl;
 
 import com.exam.notification.service.NotificationService;
+import com.exam.notification.service.ReservationNotificationService;
 import com.exam.queue.service.QueueService;
 import com.exam.reservation.dto.ReservationDTO;
 import com.exam.reservation.mapper.ReservationMapper;
@@ -24,15 +25,18 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationMapper reservationMapper;
     private final RedissonClient redissonClient;
     private final QueueService queueService;
+    private final ReservationNotificationService reservationNotificationService;
     private final NotificationService notificationService;
 
     public ReservationServiceImpl(ReservationMapper reservationMapper,
                                   RedissonClient redissonClient,
                                   QueueService queueService,
+                                  ReservationNotificationService reservationNotificationService,
                                   NotificationService notificationService) {
         this.reservationMapper = reservationMapper;
         this.redissonClient = redissonClient;
         this.queueService = queueService;
+        this.reservationNotificationService = reservationNotificationService;
         this.notificationService = notificationService;
     }
 
@@ -95,6 +99,7 @@ public class ReservationServiceImpl implements ReservationService {
                 }
             }
 
+            reservationNotificationService.notifyConfirmed(userId, seatId, roundId);
             return Map.of("success", true, "message", "예매가 완료되었습니다.");
         } finally {
             // isHeldByCurrentThread()로 먼저 확인하는 이유: TTL(10초)이 이미 만료돼서 다른 스레드가
@@ -153,6 +158,8 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setInsIp(clientIp);
         reservationMapper.insertHistory(reservation);
 
+        // 취소한 본인에게 취소 확인 메일
+        reservationNotificationService.notifyCancelled(userId, reservation.getSeatId(), reservation.getRoundId());
         // NOTI01_ALERT01: 이 회차 취소표 알림 구독자한테 통지 (best-effort, 실패해도 취소 자체엔 영향 없음)
         notificationService.publishCancelAlerts(reservation.getRoundId());
 
