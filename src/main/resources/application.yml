@@ -54,11 +54,18 @@ cloud:
       static: ${AWS_REGION:ap-northeast-2}
     cloudfront:
       domain: ${CLOUDFRONT_DOMAIN:}
+    # SQS -> Lambda -> SES 알림 파이프라인. 큐 URL 미설정(로컬 기본값 빈 문자열)이면 발행 쪽에서
+    # 스킵하도록 처리되어 있어서 로컬은 이 값 없이도 정상 기동됨
+    sqs:
+      # 회원가입 이메일 인증 + 예매확정/취소 알림이 공유(메시지의 type 필드로 Lambda가 구분)
+      notification-queue-url: ${NOTIFICATION_QUEUE_URL:}
+      # 취소표 알림(NOTI01_ALERT01) 전용 — 위 큐와 별개
+      cancel-alert-queue-url: ${CANCEL_ALERT_QUEUE_URL:}
 
 # mybatis
 mybatis:
   mapper-locations: com/exam/**/mapper/*.xml
-  type-aliases-package: com.exam.common.dto, com.exam.reservation.dto, com.exam.auth.dto, com.exam.admin.dto, com.exam.payment.dto
+  type-aliases-package: com.exam.common.dto, com.exam.reservation.dto, com.exam.auth.dto, com.exam.admin.dto, com.exam.payment.dto, com.exam.notification.dto
   map-underscore-to-camel-case: true
 
 # App - 소셜 로그인 완료 후 리다이렉트할 프론트엔드 origin
