@@ -1,8 +1,9 @@
-package com.exam.admin.service;
+package com.exam.admin.service.impl;
 
 import com.exam.admin.dto.MenuDTO;
 import com.exam.admin.dto.MenuTreeDTO;
 import com.exam.admin.mapper.MenuMapper;
+import com.exam.admin.service.MenuService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;

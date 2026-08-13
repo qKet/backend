@@ -215,6 +215,26 @@ CREATE TABLE IF NOT EXISTS RESERVATION_HISTORY (
     FOREIGN KEY (performance_id) REFERENCES PERFORMANCES(performance_id)
 );
 
+-- CANCEL_ALERTS: NOTI01_ALERT01(공연 취소표 알림) — 회차 단위 구독. use_yn 토글로 켜고 끔(행 자체는 안 지움)
+-- 같은 회차를 여러 번 눌러도(구독 취소 후 재구독 등) 행이 늘어나지 않게 (user_id, round_id) 유니크 + UPSERT로 처리
+CREATE TABLE IF NOT EXISTS CANCEL_ALERTS (
+    alert_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(50) NOT NULL,
+    round_id BIGINT NOT NULL,
+    use_yn CHAR(1) NOT NULL DEFAULT 'Y',
+
+    ins_id VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    ins_ip VARCHAR(45) NULL,
+    ins_de DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    upt_id VARCHAR(50) NULL,
+    upt_ip VARCHAR(45) NULL,
+    upt_de DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES USERS (user_id),
+    FOREIGN KEY (round_id) REFERENCES PERFORMANCE_ROUND (round_id),
+    UNIQUE KEY uk_cancel_alerts_user_round (user_id, round_id)
+);
+
 -- PROGRAMS: 프로그램관리 — 프론트 화면(라우트) 등록. program_type: 'MENU'(네비게이션에 노출) / 'PAGE'(URL 접근만, 메뉴 미노출)
 CREATE TABLE IF NOT EXISTS PROGRAMS (
     program_id BIGINT PRIMARY KEY AUTO_INCREMENT,

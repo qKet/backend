@@ -1,6 +1,8 @@
-package com.exam.reservation.service;
+package com.exam.reservation.service.impl;
+
 import com.exam.reservation.dto.SeatDTO;
 import com.exam.reservation.mapper.SeatMapper;
+import com.exam.reservation.service.SeatService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
