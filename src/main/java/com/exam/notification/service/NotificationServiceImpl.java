@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,7 +96,11 @@ public class NotificationServiceImpl implements NotificationService {
     @Scheduled(fixedRate = 5 * 60 * 1000)
     public void sweepOpenAlerts() {
         boolean queueConfigured = StringUtils.hasText(openAlertQueueUrl);
-        List<OpenAlertRecipientDTO> dueAlerts = openAlertMapper.findDueAlerts(minutesBefore);
+        // DB 서버(RDS)의 NOW()가 아니라 JVM 시각(TZ=Asia/Seoul 고정됨)을 기준으로 윈도우를 계산해서 넘김 —
+        // RDS 시간대가 UTC라 DB의 NOW()를 그대로 쓰면 KST로 저장된 open_time과 9시간 어긋나서 항상 빈 결과가 나왔음(2026-08-18 발견)
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime windowEnd = now.plusMinutes(minutesBefore);
+        List<OpenAlertRecipientDTO> dueAlerts = openAlertMapper.findDueAlerts(now, windowEnd);
         if (dueAlerts.isEmpty()) {
             return;
         }
@@ -111,6 +116,7 @@ public class NotificationServiceImpl implements NotificationService {
                             .messageBody(messageBody)
                             .build());
                     openAlertMapper.markNotified(alert.getAlertId());
+                    log.info("예매 오픈 알림 SQS publish 성공. alertId={}, to={}", alert.getAlertId(), alert.getUserEmail());
                 } else {
                     log.info("[DRY-RUN] 예매 오픈 알림 발송 대상: {}", messageBody);
                 }
