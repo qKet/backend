@@ -41,21 +41,28 @@ public class PaymentServiceImpl implements PaymentService {
     private final SeatMapper seatMapper;
     private final ReservationService reservationService;
     private final PaymentMapper paymentMapper;
+    private final PaymentReservationCommitter reservationCommitter;
     private final RestTemplate restTemplate = new RestTemplate();
     private final String tossSecretKey;
 
     public PaymentServiceImpl(SeatMapper seatMapper,
                                ReservationService reservationService,
                                PaymentMapper paymentMapper,
+                               PaymentReservationCommitter reservationCommitter,
                                @org.springframework.beans.factory.annotation.Value("${toss.secret-key}") String tossSecretKey) {
         this.seatMapper = seatMapper;
         this.reservationService = reservationService;
         this.paymentMapper = paymentMapper;
+        this.reservationCommitter = reservationCommitter;
         this.tossSecretKey = tossSecretKey;
     }
 
+    // 2026-08-18: 이 메서드에서 @Transactional을 뗐음 — 원래는 메서드 전체가 하나의 트랜잭션이라
+    // confirmWithToss()(토스 서버로 나가는 실제 네트워크 호출)가 느려지는 동안 DB 커넥션을 계속
+    // 붙잡고 있었음. 트래픽이 몰리는 오픈런 시점에 커넥션 풀 고갈로 이어질 수 있는 구조라,
+    // "DB 작업이 필요한 부분"만 PaymentReservationCommitter.commit()으로 옮기고(거기에
+    // @Transactional이 있음), 여기 confirm()은 트랜잭션 없이 그 앞뒤로 토스 API만 호출함.
     @Override
-    @Transactional
     public PaymentDTO confirm(PaymentConfirmRequestDTO request, String userId, String clientIp) {
         // 멱등성 체크: 같은 orderId로 이미 처리된 결제면 재승인/재예매 시도 없이 그 결과를 그대로 반환.
         // (버튼 중복클릭, success 페이지 새로고침, 네트워크 재시도 등으로 같은 요청이 다시 들어오는 경우 대비 —
@@ -75,39 +82,20 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "결제 금액이 올바르지 않습니다.");
         }
 
+        // 트랜잭션 밖에서 실행 — 토스 응답이 느려져도 DB 커넥션을 붙잡지 않음
         Map<String, Object> tossResponse = confirmWithToss(request);
 
-        Map<String, Object> reserveResult = reservationService.reserve(
-                userId, request.getReservationId(), request.getRoundId(), request.getSeatId(),
-                request.getQueueToken(), clientIp);
-
-        if (!Boolean.TRUE.equals(reserveResult.get("success"))) {
-            // 결제는 이미 승인됐는데 좌석 확보에 실패한 경우 — 고객에게 돈만 받고 좌석을 못 주는 상황을
-            // 막기 위해 방금 승인한 결제를 즉시 자동 취소함
-            cancelWithToss(request.getPaymentKey(), "좌석 예매 실패로 인한 자동 취소");
-            throw new BusinessException(ErrorCode.SEAT_ALREADY_TAKEN);
-        }
-
-        PaymentDTO payment = new PaymentDTO();
-        payment.setReservationId(request.getReservationId());
-        payment.setUserId(userId);
-        payment.setOrderId(request.getOrderId());
-        payment.setPaymentKey(request.getPaymentKey());
-        payment.setAmount(request.getAmount());
-        payment.setPayStatus(String.valueOf(tossResponse.get("status")));
-        payment.setApprovedAt(LocalDateTime.now());
-        payment.setInsId(userId);
-        payment.setInsIp(clientIp);
-
         try {
-            paymentMapper.save(payment);
-        } catch (DuplicateKeyException e) {
-            // 위 findByOrderId 체크 이후 극히 짧은 순간에 동일 orderId 요청이 동시에 들어와
-            // 먼저 INSERT를 끝낸 경우 — 이번 요청은 실패 처리하지 않고 먼저 처리된 결과를 그대로 반환
-            return paymentMapper.findByOrderId(request.getOrderId());
+            // 여기서부터 좌석 확보 + 결제 저장만 별도 트랜잭션(PaymentReservationCommitter)으로 처리
+            return reservationCommitter.commit(request, userId, clientIp, tossResponse.get("status"));
+        } catch (BusinessException e) {
+            if (e.getErrorCode() == ErrorCode.SEAT_ALREADY_TAKEN) {
+                // 결제는 이미 승인됐는데 좌석 확보에 실패한 경우 — 고객에게 돈만 받고 좌석을 못 주는
+                // 상황을 막기 위해 방금 승인한 결제를 즉시 자동 취소함 (트랜잭션 밖 외부 호출)
+                cancelWithToss(request.getPaymentKey(), "좌석 예매 실패로 인한 자동 취소");
+            }
+            throw e;
         }
-
-        return payment;
     }
 
     @Override
