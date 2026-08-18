@@ -11,6 +11,10 @@ spring:
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:qket}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # username/password 기본값(root/1234)은 로컬 docker-compose.yml의 MYSQL_ROOT_PASSWORD와
+    # 맞춘 로컬 전용 편의값 — 실배포(release/prod)는 K8s Secret(db-secrets, ESO가 Secrets Manager에서
+    # 채움)이 DB_USERNAME/DB_PASSWORD를 항상 덮어써서 실제로 이 기본값이 쓰이는 일은 없음.
+    # 절대 이 기본값을 배포 환경의 실제 비밀번호로 쓰지 말 것.
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:1234}
     hikari:
@@ -79,6 +83,12 @@ mybatis:
 # App - 소셜 로그인 완료 후 리다이렉트할 프론트엔드 origin
 app:
   base-url: ${APP_BASE_URL:http://localhost:3000}
+
+# CORS 허용 오리진 — 콤마(,)로 여러 개 지정 가능. 배포 환경(release/prod)은 반드시
+# CORS_ALLOWED_ORIGINS 환경변수로 실제 프론트 도메인(CloudFront/커스텀 도메인)을 넣어줘야 함 —
+# 안 넣으면 기본값(localhost:3000)만 허용되어 배포된 프론트에서 오는 요청이 전부 CORS로 막힘
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 # 소셜 로그인 (OAuth2) client-id/secret — 각 provider 개발자 콘솔에서 발급
 oauth:
