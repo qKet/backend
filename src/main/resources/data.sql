@@ -134,7 +134,12 @@ INSERT INTO USERS (user_id, user_nm, pwd, user_email, role_id, user_status) VALU
 -- (round_time = 실제 공연 일시는 원래 값 그대로 유지 — 화면/데이터상 의미는 안 바뀜)
 INSERT INTO PERFORMANCE_ROUND (performance_id, round_time, open_time, round_status, ins_id, ins_ip) VALUES
   -- 아이유 (venue=1)
-  (1, '2026-08-15 19:00:00', '2026-08-15 10:00:00', 'OPEN', 'admin01', '127.0.0.1'),
+  -- [로컬 테스트 편의] round_id=1은 일부러 "오늘 늦은 시각"으로 박아둠 — open_time은 이미 지났고
+  -- round_time(실제 공연 시각)은 아직 안 지나서 BookButton이 즉시 "open" 상태(예매하기 버튼 활성화)로
+  -- 뜸. 나머지 회차는 전부 특정 미래/과거 날짜라 "예매 전" 또는 "예매 마감" 상태뿐이라, 결제 흐름을
+  -- 로컬에서 바로 테스트하려면 이 회차를 씀. data.sql을 다시 로드하는 시점(로컬 재기동 등)의 날짜가
+  -- 바뀌면 이 값도 오늘 날짜에 맞게 다시 조정해야 함.
+  (1, '2026-08-18 23:00:00', '2026-08-18 00:00:00', 'OPEN', 'admin01', '127.0.0.1'),
   (1, '2026-08-16 17:00:00', '2026-08-16 10:00:00', 'OPEN', 'admin01', '127.0.0.1'),
   -- BTS (venue=2)
   (2, '2026-09-01 19:00:00', '2026-09-01 10:00:00', 'OPEN', 'admin01', '127.0.0.1'),

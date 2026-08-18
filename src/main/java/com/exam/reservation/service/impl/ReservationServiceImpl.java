@@ -1,14 +1,12 @@
 package com.exam.reservation.service.impl;
 
 import com.exam.notification.service.ReservationNotificationService;
-import com.exam.queue.service.QueueService;
 import com.exam.reservation.dto.ReservationDTO;
 import com.exam.reservation.mapper.ReservationMapper;
 import com.exam.reservation.service.ReservationService;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -23,25 +21,27 @@ public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationMapper reservationMapper;
     private final RedissonClient redissonClient;
-    private final QueueService queueService;
+    private final ReservationCommitter reservationCommitter;
     private final ReservationNotificationService reservationNotificationService;
 
     public ReservationServiceImpl(ReservationMapper reservationMapper,
                                   RedissonClient redissonClient,
-                                  QueueService queueService,
+                                  ReservationCommitter reservationCommitter,
                                   ReservationNotificationService reservationNotificationService) {
         this.reservationMapper = reservationMapper;
         this.redissonClient = redissonClient;
-        this.queueService = queueService;
+        this.reservationCommitter = reservationCommitter;
         this.reservationNotificationService = reservationNotificationService;
     }
 
     @Override
-    @Transactional
     /***********************************
      *  이름      :   reserve
      *  기능      :   공연 좌석 예매 (동시성 처리) — HOLD01_HOLD03: 락 구현을 직접 짠 SETNX+Lua에서
-     *              Redisson RLock으로 교체. 동작(동일 좌석 동시요청 중 1건만 성공)은 기존과 동일
+     *              Redisson RLock으로 교체. 동작(동일 좌석 동시요청 중 1건만 성공)은 기존과 동일.
+     *              2026-08-18: DB 쓰기는 ReservationCommitter(별도 트랜잭션 빈)로 분리하고,
+     *              알림 발송(SQS)은 트랜잭션·분산락이 모두 끝난 뒤로 옮김 — 느린 외부 통신
+     *              때문에 DB 커넥션/좌석 락을 필요 이상으로 오래 붙잡지 않기 위함.
      *  param    :  String,Long,Long,Long,String
      *  return   :   Map<String, Object>
      ************************************/
@@ -64,39 +64,9 @@ public class ReservationServiceImpl implements ReservationService {
             return Map.of("success", false, "message", "이미 다른 사용자가 예매 중인 좌석입니다.");
         }
 
+        Map<String, Object> result;
         try {
-            ReservationDTO reservation = new ReservationDTO();
-            reservation.setUserId(userId);
-            reservation.setReservationId(reservationId);
-            reservation.setSeatId(seatId);
-            reservation.setRoundId(roundId);
-            // RESERVATIONS 는 UPDATE(누가 예매했는지), RESERVATION_HISTORY 는 INSERT(누가 이 이력을 남겼는지) — 행위자·IP는 둘 다 동일
-            reservation.setUptId(userId);
-            reservation.setUptIp(clientIp);
-            reservation.setInsId(userId);
-            reservation.setInsIp(clientIp);
-
-            int affected = reservationMapper.save(reservation);
-            if (affected == 0) {
-                return Map.of("success", false, "message", "이미 예매된 좌석입니다.");
-            }
-
-            reservation.setAction("RESERVED");
-            reservationMapper.insertHistory(reservation);
-
-            // 예매 성공 시 대기열 active 자리 즉시 반납
-            // 대기열을 거치지 않고 들어온 요청일 수도 있으니 토큰 없으면 그냥 건너뜀
-            // 반납 자체가 실패해도 예매 성공에는 영향 주지 않도록 예외를 삼킴
-            if (queueToken != null && !queueToken.isBlank()) {
-                try {
-                    queueService.leave(queueToken, userId);
-                } catch (Exception e) {
-                    // 반납 실패는 로그만 남기고 무시 (TTL로 나중에 자동 정리됨)
-                }
-            }
-
-            reservationNotificationService.notifyConfirmed(userId, seatId, roundId);
-            return Map.of("success", true, "message", "예매가 완료되었습니다.");
+            result = reservationCommitter.commitReserve(userId, reservationId, roundId, seatId, queueToken, clientIp);
         } finally {
             // isHeldByCurrentThread()로 먼저 확인하는 이유: TTL(10초)이 이미 만료돼서 다른 스레드가
             // 새로 락을 잡은 상태에서 이 스레드가 뒤늦게 unlock()을 호출하면 IllegalMonitorStateException이
@@ -106,6 +76,13 @@ public class ReservationServiceImpl implements ReservationService {
                 lock.unlock();
             }
         }
+
+        // 알림 발송은 DB 트랜잭션도 끝나고 분산락도 풀린 다음에 실행 — SQS 통신이 느려져도
+        // 이 좌석을 노리는 다른 요청이나 DB 커넥션 풀에 영향을 안 주도록 함
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            reservationNotificationService.notifyConfirmed(userId, seatId, roundId);
+        }
+        return result;
     }
     /***********************************
      *  이름      :  getMyReservations
@@ -131,32 +108,20 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
-    @Transactional
     /***********************************
      *  이름      :  cancel
-     *  기능      :  예매 취소 기능
+     *  기능      :  예매 취소 기능 — 2026-08-18: DB 쓰기는 ReservationCommitter로 분리하고,
+     *              취소 확인 알림(SQS)은 트랜잭션이 끝난 뒤로 옮김(reserve()와 동일한 이유)
      *  param    :  Long,String
      *  return   :  Map<String, Object>
      ************************************/
     public Map<String, Object> cancel(Long reservationId, String userId, String clientIp) {
-        ReservationDTO reservation = reservationMapper.findById(reservationId);
-        if (reservation == null || !reservation.getUserId().equals(userId)) {
-            return Map.of("success", false, "message", "예매 정보를 찾을 수 없습니다.");
+        Map<String, Object> result = reservationCommitter.commitCancel(reservationId, userId, clientIp);
+
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            reservationNotificationService.notifyCancelled(
+                    userId, (Long) result.get("seatId"), (Long) result.get("roundId"));
         }
-        if (!"RESERVED".equals(reservation.getReservedStatus())) {
-            return Map.of("success", false, "message", "이미 취소된 예매입니다.");
-        }
-
-        reservationMapper.cancel(reservationId, userId, clientIp);
-
-        reservation.setAction("CANCELLED");
-        reservation.setInsId(userId);
-        reservation.setInsIp(clientIp);
-        reservationMapper.insertHistory(reservation);
-
-        // 취소한 본인에게 취소 확인 메일
-        reservationNotificationService.notifyCancelled(userId, reservation.getSeatId(), reservation.getRoundId());
-
-        return Map.of("success", true, "message", "예매가 취소되었습니다.");
+        return result;
     }
 }
