@@ -35,10 +35,12 @@
 
     <!--
          이름            :  findDueAlerts
-         기능            :  open_time이 minutesBefore분 이내로 다가왔고 아직 안 보낸(notified_yn='N') 구독 조회 —
-                            NotificationServiceImpl의 @Scheduled 스위퍼(5분 주기)가 씀
+         기능            :  open_time이 [now, windowEnd] 사이로 다가왔고 아직 안 보낸(notified_yn='N') 구독 조회 —
+                            NotificationServiceImpl의 @Scheduled 스위퍼(5분 주기)가 씀.
+                            DB 서버의 NOW()를 쓰지 않고 JVM이 계산한 값을 파라미터로 받는 이유는
+                            OpenAlertMapper.findDueAlerts 주석 참고 (RDS 시간대가 UTC라 NOW() 쓰면 항상 매칭 실패했음)
          resultType     :  OpenAlertRecipientDTO
-         parameterType  :  int minutesBefore
+         parameterType  :  LocalDateTime now, LocalDateTime windowEnd
     -->
     <select id="findDueAlerts" resultType="OpenAlertRecipientDTO">
         SELECT oa.alert_id  AS alertId,
@@ -54,7 +56,7 @@
         JOIN VENUE v ON p.venue_id = v.venue_id
         WHERE oa.use_yn = 'Y'
           AND oa.notified_yn = 'N'
-          AND pr.open_time BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL #{minutesBefore} MINUTE)
+          AND pr.open_time BETWEEN #{now} AND #{windowEnd}
     </select>
 
     <!--

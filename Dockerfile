@@ -10,6 +10,14 @@ WORKDIR /app
 
 COPY build/libs/*.jar app.jar
 
-EXPOSE 8090
+# EXPOSE는 application.yml의 server.port(8080)와 반드시 맞춰야 함 — 실제 트래픽 차단 효과는
+# 없지만(문서용 메타데이터) K8s Service/probe 포트(CD 레포 backend-deployment.yaml)와
+# 일치시켜야 로컬 docker run -p 매핑이나 문서 볼 때 헷갈리지 않음.
+EXPOSE 8080
+
+# 컨테이너를 root로 띄우지 않음 — JVM 프로세스가 컴프로마이즈돼도 컨테이너 안에서 root 권한을
+# 못 갖게 하는 최소한의 방어. UID 고정(1000)은 K8s SecurityContext에서 runAsNonRoot 검증할 때도 씀.
+RUN useradd --system --uid 1000 --shell /usr/sbin/nologin appuser
+USER appuser
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
