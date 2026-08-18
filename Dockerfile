@@ -4,7 +4,13 @@
 #
 # 로컬에서 그냥 `docker build .`만 하면 안 됨 — 먼저 `./gradlew clean bootJar`로
 # build/libs/*.jar를 만들어둬야 함.
-FROM eclipse-temurin:21-jre
+#
+# 태그를 -jammy(Ubuntu 22.04)로 고정 — OS 버전 안 박은 `21-jre`가 최근 Ubuntu Noble(24.04)
+# 베이스로 바뀌면서, 그 이미지가 기본으로 갖고 있는 `ubuntu` 유저가 이미 UID 1000을 써서
+# 아래 `useradd --uid 1000`이 "UID 1000 is not unique"(exit code 4)로 빌드 실패했음
+# (2026-08-18 실제로 겪음). -jammy는 이 기본 유저가 없어서 UID 1000을 그대로 쓸 수 있고,
+# 앞으로 베이스 이미지가 또 바뀌어도 이 Dockerfile은 영향 안 받음.
+FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
