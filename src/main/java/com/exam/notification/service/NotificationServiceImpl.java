@@ -111,6 +111,7 @@ public class NotificationServiceImpl implements NotificationService {
                             .messageBody(messageBody)
                             .build());
                     openAlertMapper.markNotified(alert.getAlertId());
+                    log.info("예매 오픈 알림 SQS publish 성공. alertId={}, to={}", alert.getAlertId(), alert.getUserEmail());
                 } else {
                     log.info("[DRY-RUN] 예매 오픈 알림 발송 대상: {}", messageBody);
                 }
