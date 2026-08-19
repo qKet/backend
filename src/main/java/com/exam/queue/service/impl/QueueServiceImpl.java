@@ -25,7 +25,10 @@ import java.util.UUID;
 public class QueueServiceImpl implements QueueService {
 
         // private static final int MAX_ACTIVE_USERS = 0; // TEMP: 순번 화면 테스트용
-        private static final int MAX_ACTIVE_USERS = 10;
+        // 2026-08-19: 2000명 규모 부하테스트에서 10으로는 ACTIVE_TTL(10분) 동안 처리 가능한 인원이
+        // 너무 적어(초당 10/600 명 수준) 테스트 시간 내에 아무도 대기열을 못 벗어나는 현상 확인 —
+        // 150으로 우선 상향 후 재측정
+        private static final int MAX_ACTIVE_USERS = 150;
 
         private static final Duration WAITING_TTL = Duration.ofMinutes(30);
 
