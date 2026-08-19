@@ -54,6 +54,8 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: ture
 
   metrics:
     tags:
