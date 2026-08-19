@@ -34,13 +34,9 @@ public class AdminPerformanceController {
         this.openAlertMapper = openAlertMapper;
     }
 
-    private UserDTO getLoginUser(HttpSession session) {
-        return (UserDTO) session.getAttribute("loginUser");
-    }
-
-    private boolean isManagerOrAdmin(UserDTO user) {
-        return user != null && (Long.valueOf(2L).equals(user.getRoleId()) || Long.valueOf(3L).equals(user.getRoleId()));
-    }
+    // 2026-08-18: 로그인 여부/역할(매니저 이상) 체크는 이제 AdminAccessInterceptor가
+    // 컨트롤러 진입 전에 미리 걸러줌 (여기 매핑 경로가 "/manage/**"라서 자동으로 적용됨).
+    // 아래 메서드들에서 getLoginUser는 "이미 검증된 로그인 사용자 정보를 꺼내 쓰는 용도"로만 남겨둠.
 
     /***********************************
      *  URL      :   "/venues"
@@ -51,8 +47,6 @@ public class AdminPerformanceController {
     // 공연장 목록 — 매니저(2) 이상
     @GetMapping("/venues")
     public List<VenueDTO> getVenues(HttpSession session) {
-        if (!isManagerOrAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.FORBIDDEN);
         return performanceMapper.findAllVenues();
     }
 
@@ -67,9 +61,7 @@ public class AdminPerformanceController {
     @PostMapping("/events")
     public Map<String, Object> createPerformance(@RequestBody PerformanceDTO dto, HttpSession session,
                                                HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isManagerOrAdmin(loginUser))
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         String actorId = loginUser.getUserId();
         String clientIp = WebUtil.getClientIp(request);
         dto.setInsId(actorId);
@@ -100,9 +92,7 @@ public class AdminPerformanceController {
                                                @RequestBody PerformanceDTO dto,
                                                HttpSession session,
                                                HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isManagerOrAdmin(loginUser))
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         String actorId = loginUser.getUserId();
         String clientIp = WebUtil.getClientIp(request);
         dto.setPerformanceId(performanceId);
@@ -131,8 +121,6 @@ public class AdminPerformanceController {
     @Transactional
     @DeleteMapping("/events/{performanceId}")
     public Map<String, Object> deletePerformance(@PathVariable Long performanceId, HttpSession session) {
-        if (!isManagerOrAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.FORBIDDEN);
         if (performanceMapper.hasPassedRound(performanceId))
             throw new BusinessException(ErrorCode.ROUND_ALREADY_OPEN, "예매 오픈된 회차가 있어 삭제할 수 없습니다.");
         performanceMapper.deleteReservationHistoryByPerformanceId(performanceId);
@@ -156,9 +144,7 @@ public class AdminPerformanceController {
                                          @RequestBody RoundDTO dto,
                                          HttpSession session,
                                          HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isManagerOrAdmin(loginUser))
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         if (performanceMapper.hasPassedRoundById(roundId))
             throw new BusinessException(ErrorCode.ROUND_ALREADY_OPEN, "예매 오픈된 회차는 수정할 수 없습니다.");
         dto.setRoundId(roundId);
@@ -180,8 +166,6 @@ public class AdminPerformanceController {
     public Map<String, Object> deleteRound(@PathVariable Long performanceId,
                                          @PathVariable Long roundId,
                                          HttpSession session) {
-        if (!isManagerOrAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.FORBIDDEN);
         if (performanceMapper.hasPassedRoundById(roundId))
             throw new BusinessException(ErrorCode.ROUND_ALREADY_OPEN, "예매 오픈된 회차는 삭제할 수 없습니다.");
         performanceMapper.deleteReservationHistoryByRoundId(roundId);
@@ -204,9 +188,7 @@ public class AdminPerformanceController {
                                       @RequestBody RoundDTO dto,
                                       HttpSession session,
                                       HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isManagerOrAdmin(loginUser))
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         String actorId = loginUser.getUserId();
         String clientIp = WebUtil.getClientIp(request);
         dto.setPerformanceId(performanceId);

@@ -3,8 +3,6 @@ package com.exam.admin.controller;
 import com.exam.auth.dto.UserDTO;
 import com.exam.admin.dto.ProgramDTO;
 import com.exam.admin.dto.RoleProgramDTO;
-import com.exam.common.exception.BusinessException;
-import com.exam.common.exception.ErrorCode;
 import com.exam.admin.service.ProgramService;
 import com.exam.common.util.WebUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,13 +23,7 @@ public class ProgramController {
         this.programService = programService;
     }
 
-    private UserDTO getLoginUser(HttpSession session) {
-        return (UserDTO) session.getAttribute("loginUser");
-    }
-
-    private boolean isAdmin(UserDTO user) {
-        return user != null && Long.valueOf(3L).equals(user.getRoleId());
-    }
+    // 2026-08-18: 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 미리 걸러줌.
 
     /***********************************
      * URL : "/admin/programs"
@@ -41,8 +33,6 @@ public class ProgramController {
      ************************************/
     @GetMapping
     public List<ProgramDTO> getPrograms(HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         return programService.getPrograms();
     }
 
@@ -55,9 +45,7 @@ public class ProgramController {
     @PostMapping
     public Map<String, Object> createProgram(@RequestBody ProgramDTO body, HttpSession session,
             HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isAdmin(loginUser))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         body.setInsId(loginUser.getUserId());
         body.setInsIp(WebUtil.getClientIp(request));
         programService.createProgram(body);
@@ -73,9 +61,7 @@ public class ProgramController {
     @PutMapping("/{programId}")
     public Map<String, Object> updateProgram(@PathVariable Long programId, @RequestBody ProgramDTO body,
             HttpSession session, HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isAdmin(loginUser))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         body.setProgramId(programId);
         body.setUptId(loginUser.getUserId());
         body.setUptIp(WebUtil.getClientIp(request));
@@ -91,8 +77,6 @@ public class ProgramController {
      ************************************/
     @DeleteMapping("/{programId}")
     public Map<String, Object> deleteProgram(@PathVariable Long programId, HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         programService.deleteProgram(programId);
         return Map.of("success", true);
     }
@@ -105,8 +89,6 @@ public class ProgramController {
      ************************************/
     @GetMapping("/role-mappings")
     public List<RoleProgramDTO> getRoleMappings(HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         return programService.getRolePrograms();
     }
 
@@ -119,9 +101,7 @@ public class ProgramController {
     @PutMapping("/role-mappings")
     public Map<String, Object> updateRoleMappings(@RequestBody List<RoleProgramDTO> body, HttpSession session,
             HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isAdmin(loginUser))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         programService.updateRolePrograms(body, loginUser.getUserId(), WebUtil.getClientIp(request));
         return Map.of("success", true);
     }
