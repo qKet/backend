@@ -55,7 +55,7 @@ management:
     health:
       show-details: never
       probes:
-        enabled: ture
+        enabled: true
 
   metrics:
     tags:
