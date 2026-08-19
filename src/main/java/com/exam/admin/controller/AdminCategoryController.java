@@ -2,8 +2,6 @@ package com.exam.admin.controller;
 
 import com.exam.auth.dto.UserDTO;
 import com.exam.admin.dto.CategoryDTO;
-import com.exam.common.exception.BusinessException;
-import com.exam.common.exception.ErrorCode;
 import com.exam.admin.service.CategoryService;
 import com.exam.common.util.WebUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,13 +22,7 @@ public class AdminCategoryController {
         this.categoryService = categoryService;
     }
 
-    private UserDTO getLoginUser(HttpSession session) {
-        return (UserDTO) session.getAttribute("loginUser");
-    }
-
-    private boolean isAdmin(UserDTO user) {
-        return user != null && Long.valueOf(3L).equals(user.getRoleId());
-    }
+    // 2026-08-18: 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 미리 걸러줌.
 
     /***********************************
      * URL : "/admin/categories"
@@ -40,8 +32,6 @@ public class AdminCategoryController {
      ************************************/
     @GetMapping
     public List<CategoryDTO> getCategories(HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         return categoryService.getAllCategories();
     }
 
@@ -54,9 +44,7 @@ public class AdminCategoryController {
     @PostMapping
     public Map<String, Object> createCategory(@RequestBody CategoryDTO body, HttpSession session,
             HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isAdmin(loginUser))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         body.setInsId(loginUser.getUserId());
         body.setInsIp(WebUtil.getClientIp(request));
         categoryService.createCategory(body);
@@ -72,9 +60,7 @@ public class AdminCategoryController {
     @PutMapping("/{categoryId}")
     public Map<String, Object> updateCategory(@PathVariable Long categoryId, @RequestBody CategoryDTO body,
             HttpSession session, HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isAdmin(loginUser))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         body.setCategoryId(categoryId);
         body.setUptId(loginUser.getUserId());
         body.setUptIp(WebUtil.getClientIp(request));
@@ -90,8 +76,6 @@ public class AdminCategoryController {
      ************************************/
     @DeleteMapping("/{categoryId}")
     public Map<String, Object> deleteCategory(@PathVariable Long categoryId, HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         categoryService.deleteCategory(categoryId);
         return Map.of("success", true);
     }

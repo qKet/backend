@@ -1,8 +1,5 @@
 package com.exam.admin.controller;
 
-import com.exam.auth.dto.UserDTO;
-import com.exam.common.exception.BusinessException;
-import com.exam.common.exception.ErrorCode;
 import com.exam.reservation.dto.ReservationDTO;
 import com.exam.reservation.service.ReservationService;
 import jakarta.servlet.http.HttpSession;
@@ -21,13 +18,7 @@ public class AdminReservationController {
         this.reservationService = reservationService;
     }
 
-    private UserDTO getLoginUser(HttpSession session) {
-        return (UserDTO) session.getAttribute("loginUser");
-    }
-
-    private boolean isAdmin(UserDTO user) {
-        return user != null && Long.valueOf(3L).equals(user.getRoleId());
-    }
+    // 2026-08-18: 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 미리 걸러줌.
 
     /***********************************
      * URL : "/admin/reservations/history"
@@ -42,8 +33,6 @@ public class AdminReservationController {
                                             @RequestParam(required = false) String userId,
                                             @RequestParam(required = false) String action,
                                             HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         return reservationService.getHistoryForAdmin(from, to, userId, action);
     }
 }
