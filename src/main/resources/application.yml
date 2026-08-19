@@ -52,8 +52,10 @@ spring:
     store-type: redis
     timeout: 1800s
 
-# Actuator
+# Actuator — server.port(8081)를 메인 서버(8080)와 분리 — 비즈니스 요청이 몰려서
 management:
+  server:
+    port: 8081
   endpoints:
     web:
       exposure:
@@ -62,6 +64,8 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
 
   metrics:
     tags:
