@@ -90,7 +90,7 @@ cloud:
 # mybatis
 mybatis:
   mapper-locations: com/exam/**/mapper/*.xml
-  type-aliases-package: com.exam.common.dto, com.exam.reservation.dto, com.exam.auth.dto, com.exam.admin.dto, com.exam.payment.dto, com.exam.notification.dto
+  type-aliases-package: com.exam.common.dto, com.exam.reservation.dto, com.exam.auth.dto, com.exam.admin.dto, com.exam.payment.dto, com.exam.notification.dto, com.exam.review.dto
   map-underscore-to-camel-case: true
 
 # App - 소셜 로그인 완료 후 리다이렉트할 프론트엔드 origin

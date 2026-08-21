@@ -17,4 +17,8 @@ public interface ReservationMapper {
     ReservationDTO findById(Long reservationId);
     int cancel(@Param("reservationId") Long reservationId, @Param("uptId") String uptId, @Param("uptIp") String uptIp);
     SeatDisplayInfoDTO findSeatDisplayInfo(@Param("seatId") Long seatId, @Param("roundId") Long roundId);
+    // 감상평(REV01) 작성 자격 체크용 — 해당 회차를 실제로 예매했는지 여부
+    int countReservationByRound(@Param("userId") String userId, @Param("roundId") Long roundId);
+    // 감상평 작성 화면의 회차 선택 드롭다운용 — 이 공연에서 사용자가 예매한 회차 목록
+    List<ReservationDTO> findReservedRoundsByPerformance(@Param("userId") String userId, @Param("performanceId") Long performanceId);
 }
