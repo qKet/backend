@@ -321,4 +321,30 @@ CREATE TABLE IF NOT EXISTS PAYMENTS (
     UNIQUE KEY uk_payments_payment_key (payment_key)
 );
 
+-- REVIEWS: 공연 감상평(REV01). 회차(round) 단위로 사용자 1인 1개만 허용(UNIQUE) — 같은 공연도
+-- 회차를 여러 번 예매해서 봤으면 회차별로 따로 작성 가능. performance_id는 조회 편의를 위한 비정규화
+-- 컬럼(RESERVATIONS 테이블과 동일한 패턴). 삭제는 물리삭제 아니고 use_yn='N' 소프트 삭제
+CREATE TABLE IF NOT EXISTS REVIEWS (
+    review_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    performance_id BIGINT NOT NULL,
+    round_id BIGINT NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+    content TEXT NOT NULL,
+    rating TINYINT NOT NULL DEFAULT 5 CHECK (rating BETWEEN 1 AND 5),
+    contains_spoiler CHAR(1) NOT NULL DEFAULT 'N',
+    use_yn CHAR(1) NOT NULL DEFAULT 'Y',
+
+    ins_id VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    ins_ip VARCHAR(45) NULL,
+    ins_de DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    upt_id VARCHAR(50) NULL,
+    upt_ip VARCHAR(45) NULL,
+    upt_de DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (performance_id) REFERENCES PERFORMANCES (performance_id),
+    FOREIGN KEY (round_id) REFERENCES PERFORMANCE_ROUND (round_id),
+    FOREIGN KEY (user_id) REFERENCES USERS (user_id),
+    UNIQUE KEY uk_reviews_round_user (round_id, user_id)
+);
+
 SHOW TABLES;
