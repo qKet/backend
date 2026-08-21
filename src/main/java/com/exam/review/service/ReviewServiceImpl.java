@@ -16,25 +16,31 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewMapper reviewMapper;
     private final ReservationService reservationService;
+    private final SpoilerDetectionService spoilerDetectionService;
 
-    public ReviewServiceImpl(ReviewMapper reviewMapper, ReservationService reservationService) {
+    public ReviewServiceImpl(ReviewMapper reviewMapper, ReservationService reservationService,
+                              SpoilerDetectionService spoilerDetectionService) {
         this.reviewMapper = reviewMapper;
         this.reservationService = reservationService;
+        this.spoilerDetectionService = spoilerDetectionService;
     }
 
     /***********************************
      *  이름      :  write
-     *  기능      :  감상평 작성 — 그 회차 예매자만 가능, 회차당 1개만 허용
-     *  param    :  Long, Long, String, String, int, boolean, String
+     *  기능      :  감상평 작성 — 그 회차 예매자만 가능, 회차당 1개만 허용. 스포일러 여부는
+     *              사용자가 직접 체크하지 않고 AI(AI01_SPOIL01)가 본문을 보고 자동 판별한다
+     *  param    :  Long, Long, String, String, int, String
      *  return   :  ReviewDTO
      ************************************/
     @Override
     @Transactional
-    public ReviewDTO write(Long performanceId, Long roundId, String userId, String content, int rating, boolean containsSpoiler, String clientIp) {
+    public ReviewDTO write(Long performanceId, Long roundId, String userId, String content, int rating, String clientIp) {
         requireValidRating(rating);
         if (!reservationService.hasReservation(userId, roundId)) {
             throw new BusinessException(ErrorCode.REVIEW_WRITE_NOT_ALLOWED);
         }
+
+        String containsSpoiler = spoilerDetectionService.isSpoiler(content) ? "Y" : "N";
 
         // round_id+user_id UNIQUE 제약이 use_yn과 무관하게 걸려있어서, 예전에 삭제(use_yn='N')했던
         // 회차 리뷰가 있으면 새로 INSERT하지 않고 그 행을 되살림 (안 그러면 제약 위반으로 에러남)
@@ -45,7 +51,7 @@ public class ReviewServiceImpl implements ReviewService {
             }
             existing.setContent(content);
             existing.setRating(rating);
-            existing.setContainsSpoiler(containsSpoiler ? "Y" : "N");
+            existing.setContainsSpoiler(containsSpoiler);
             existing.setUptId(userId);
             existing.setUptIp(clientIp);
             reviewMapper.update(existing);
@@ -58,7 +64,7 @@ public class ReviewServiceImpl implements ReviewService {
         review.setUserId(userId);
         review.setContent(content);
         review.setRating(rating);
-        review.setContainsSpoiler(containsSpoiler ? "Y" : "N");
+        review.setContainsSpoiler(containsSpoiler);
         review.setInsId(userId);
         review.setInsIp(clientIp);
 
@@ -90,19 +96,19 @@ public class ReviewServiceImpl implements ReviewService {
 
     /***********************************
      *  이름      :  update
-     *  기능      :  감상평 수정 (본인만)
-     *  param    :  Long, String, String, boolean, String
+     *  기능      :  감상평 수정 (본인만). 스포일러 여부는 수정된 본문 기준으로 AI가 다시 판별한다
+     *  param    :  Long, String, String, int, String
      *  return   :  ReviewDTO
      ************************************/
     @Override
     @Transactional
-    public ReviewDTO update(Long reviewId, String userId, String content, int rating, boolean containsSpoiler, String clientIp) {
+    public ReviewDTO update(Long reviewId, String userId, String content, int rating, String clientIp) {
         requireValidRating(rating);
         ReviewDTO review = requireOwnedReview(reviewId, userId);
 
         review.setContent(content);
         review.setRating(rating);
-        review.setContainsSpoiler(containsSpoiler ? "Y" : "N");
+        review.setContainsSpoiler(spoilerDetectionService.isSpoiler(content) ? "Y" : "N");
         review.setUptId(userId);
         review.setUptIp(clientIp);
         reviewMapper.update(review);
