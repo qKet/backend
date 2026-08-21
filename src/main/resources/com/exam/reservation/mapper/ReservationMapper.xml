@@ -170,4 +170,23 @@
         WHERE s.seat_id = #{seatId}
     </select>
 
+    <select id="countReservationByRound" resultType="int">
+        SELECT COUNT(*)
+        FROM RESERVATIONS
+        WHERE user_id = #{userId}
+          AND round_id = #{roundId}
+          AND reserved_status = 'RESERVED'
+    </select>
+
+    <select id="findReservedRoundsByPerformance" resultType="ReservationDTO">
+        SELECT DISTINCT r.round_id    AS roundId,
+                        pr.round_time AS roundTime
+        FROM RESERVATIONS r
+                 JOIN PERFORMANCE_ROUND pr ON r.round_id = pr.round_id
+        WHERE r.user_id = #{userId}
+          AND r.performance_id = #{performanceId}
+          AND r.reserved_status = 'RESERVED'
+        ORDER BY pr.round_time
+    </select>
+
 </mapper>
