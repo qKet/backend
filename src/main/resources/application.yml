@@ -79,6 +79,10 @@ cloud:
       # 예매 오픈 알림 전용 — 위 큐와 별개
       open-alert-queue-url: ${OPEN_ALERT_QUEUE_URL:}
 
+# 감상평 스포일러 자동판별(AI01_SPOIL01)에 쓰는 OpenAI API 키
+openai:
+  api-key: ${OPENAI_API_KEY:}
+
 # mybatis
 mybatis:
   mapper-locations: com/exam/**/mapper/*.xml

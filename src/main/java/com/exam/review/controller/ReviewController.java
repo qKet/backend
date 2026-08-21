@@ -65,7 +65,7 @@ public class ReviewController {
                             HttpServletRequest servletRequest) {
         UserDTO loginUser = requireLogin(session);
         return reviewService.write(performanceId, request.getRoundId(), loginUser.getUserId(), request.getContent(),
-                request.getRating(), request.isContainsSpoiler(), WebUtil.getClientIp(servletRequest));
+                request.getRating(), WebUtil.getClientIp(servletRequest));
     }
 
     /***********************************
@@ -81,7 +81,7 @@ public class ReviewController {
                              HttpServletRequest servletRequest) {
         UserDTO loginUser = requireLogin(session);
         return reviewService.update(reviewId, loginUser.getUserId(), request.getContent(), request.getRating(),
-                request.isContainsSpoiler(), WebUtil.getClientIp(servletRequest));
+                WebUtil.getClientIp(servletRequest));
     }
 
     /***********************************
