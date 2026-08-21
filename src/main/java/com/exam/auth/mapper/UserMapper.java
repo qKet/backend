@@ -16,4 +16,7 @@ public interface UserMapper {
     List<Map<String, Object>> findAllRoles();
     UserDTO findByEmail(@Param("email") String email);
     UserDTO findByProviderAndProviderUserId(@Param("provider") String provider, @Param("providerUserId") String providerUserId);
+    // 비밀번호 재설정(MEM02_LOGIN01) — 본인이 아니라 시스템이 대신 바꾸는 거라 uptId엔 userId 자신을 씀
+    int updatePwd(@Param("userId") String userId, @Param("pwd") String pwd,
+                  @Param("uptId") String uptId, @Param("uptIp") String uptIp);
 }
