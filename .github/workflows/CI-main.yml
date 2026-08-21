@@ -1,21 +1,23 @@
 # #######################################
-# CI-release.yml
-# release 브랜치에 push 시 backend 이미지 빌드 + ECR push + qKet/CD write-back까지 담당.
+# CI-main.yml
+# main 브랜치에 push 시 backend 이미지 빌드 + ECR push + qKet/CD write-back까지 담당 — prod용.
+# CI-release.yml과 거의 동일, 다른 점은 트리거 브랜치(main)와 write-back 대상 파일
+# (helm/values-prod.yaml, release는 helm/values-release.yaml)뿐.
 #
 # 배포(CD)는 argoCD가 담당:
 #   - namespace/ingress/networkpolicy → Infra/kubernetes (ArgoCD Application "infra-manifests")
-#   - Deployment/Service              → qKet/CD (ArgoCD Application "app-deploy")
+#   - Deployment/Service              → qKet/CD (ArgoCD Application "qket-cd-prod")
 #
 # qKet/CD write-back 인증: GitHub App(qket-ci-bot, qKet 조직 소유, CD 레포에만 설치,
 # Contents:Read-and-write 권한만) — PAT 대신 이 방식을 쓴 이유는 장기 자격증명을 시크릿에
 # 안 두기 위해서(QKET_CI_APP_PRIVATE_KEY로 실행할 때마다 ~1시간짜리 토큰을 새로 발급받음).
 # #######################################
-name: Build & Push (backend, release)
+name: Build & Push (backend, prod)
 
 on:
   push:
     branches:
-      - release
+      - main
   workflow_dispatch:
 
 permissions:
@@ -60,8 +62,6 @@ jobs:
       - uses: actions/checkout@v4
 
       # Gradle 빌드
-      # cache: gradle로 의존성 캐싱되고
-      # 여기서 바로 실패/표시됨. bootJar만으론 test가 안 돌아서 test를 명시적으로 넣음.
       - uses: actions/setup-java@v4
         with:
           java-version: "21"
@@ -75,8 +75,6 @@ jobs:
 
       # 고정 키(AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) 대신 OIDC로 인증 —
       # 장기 자격증명을 GitHub 시크릿에 안 둠 (CI 도구 선택 ADR에서 결정한 방향).
-      # TODO: AWS_GITHUB_ACTIONS_ROLE_ARN — GitHub OIDC provider + IAM Role을 Terraform으로
-      # 아직 안 만듦. 이 role은 ECR push 권한만 최소로 가지면 됨.
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -87,14 +85,12 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 이미지 태그: backend-{커밋SHA 앞 7글자} — 뒤 write-back 스텝에서도 같은 값을 써야 해서
-      # step output으로 뽑아둠(태그 계산 로직이 두 군데(빌드/write-back)서 따로 계산되다 어긋나는 걸 방지).
+      # 이미지 태그: backend-{커밋SHA 앞 7글자} — release와 같은 ECR 저장소를 공유하되 커밋
+      # SHA가 다르니 태그도 자연히 달라짐(레포별 저장소를 안 나눈 이유는 03_registry/main.tf 참고).
       - name: Compute image tag
         id: tag
         run: echo "tag=backend-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
-      # 빌드 컨텍스트가 "."인 이유: 이 워크플로우가 이제 backend 레포 자체 안에 있어서
-      # (예전 모노레포 시절엔 "./backend"였음 — 레포 분리 후 경로 수정됨)
       - name: Build and push backend image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
@@ -121,11 +117,9 @@ jobs:
           token: ${{ steps.cd-app-token.outputs.token }}
           path: cd-repo
 
-      # helm/values-release.yaml(2026-08-21 이전엔 helm/values.yaml)의 "backend:" 블록 안 첫
-      # image 줄만 찾아서 값 교체 — 처음엔 BACKEND_IMAGE 플레이스홀더였다가 이후로는 이전에
-      # 써둔 실제 이미지 값이 들어있어도(idempotent) 항상 동작. 이름 뒤에 붙는 주석에 의존하지
-      # 않고 "backend:" 다음 줄부터 다음 최상위 키(들여쓰기 없는 줄) 전까지로 범위를 좁혀서
-      # frontend.image를 안 건드림.
+      # helm/values-prod.yaml의 "backend:" 블록 안 첫 image 줄만 찾아서 값 교체 — release와
+      # 달리 이 파일은 helm/values-release.yaml 위에 얹히는 오버레이라 image 필드가 명시적으로
+      # 있어야 함(안 그러면 release 값을 그대로 상속해버림, CD/helm/values-prod.yaml 참고).
       - name: Update image tag in qKet/CD
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
@@ -133,10 +127,10 @@ jobs:
         run: |
           IMAGE="$REGISTRY/$ECR_REPOSITORY:$TAG"
           cd cd-repo
-          sed -i -E "/^backend:/,/^[a-zA-Z]/ s|^(  image: ).*|\1$IMAGE|" helm/values-release.yaml
+          sed -i -E "/^backend:/,/^[a-zA-Z]/ s|^(  image: ).*|\1$IMAGE|" helm/values-prod.yaml
           git config user.name "qket-ci-bot[bot]"
           git config user.email "qket-ci-bot[bot]@users.noreply.github.com"
-          git add helm/values-release.yaml
+          git add helm/values-prod.yaml
           git diff --cached --quiet && echo "No image change, skip commit" && exit 0
-          git commit -m "chore: update backend image to $TAG"
+          git commit -m "chore: update backend(prod) image to $TAG"
           git push
