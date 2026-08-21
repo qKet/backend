@@ -15,6 +15,6 @@ public interface ProgramMapper {
 
     List<RoleProgramDTO> findAllRolePrograms();
     int deleteRoleProgramsByProgramId(Long programId);
-    int deleteAllRolePrograms();
+    int updateRoleProgramUseYn(RoleProgramDTO roleProgramDTO);
     int saveRoleProgram(RoleProgramDTO roleProgramDTO);
 }

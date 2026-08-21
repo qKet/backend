@@ -9,5 +9,4 @@ import java.util.List;
 public interface SeatMapper {
     List<SeatDTO> findByRoundId(Long roundId);
     SeatDTO findById(Long seatId);
-    int updateStatus(Long seatId, String status);
 }

@@ -1,0 +1,149 @@
+package com.exam.reservation.service.impl;
+
+import com.exam.notification.service.ReservationNotificationService;
+import com.exam.reservation.dto.ReservationDTO;
+import com.exam.reservation.mapper.ReservationMapper;
+import com.exam.reservation.service.ReservationService;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+/**
+ *
+ 파일명: ReservationServiceImpl.java
+ *
+ **/
+@Service
+public class ReservationServiceImpl implements ReservationService {
+
+    private final ReservationMapper reservationMapper;
+    private final RedissonClient redissonClient;
+    private final ReservationCommitter reservationCommitter;
+    private final ReservationNotificationService reservationNotificationService;
+
+    public ReservationServiceImpl(ReservationMapper reservationMapper,
+                                  RedissonClient redissonClient,
+                                  ReservationCommitter reservationCommitter,
+                                  ReservationNotificationService reservationNotificationService) {
+        this.reservationMapper = reservationMapper;
+        this.redissonClient = redissonClient;
+        this.reservationCommitter = reservationCommitter;
+        this.reservationNotificationService = reservationNotificationService;
+    }
+
+    @Override
+    /***********************************
+     *  이름      :   reserve
+     *  기능      :   공연 좌석 예매 (동시성 처리) — HOLD01_HOLD03: 락 구현을 직접 짠 SETNX+Lua에서
+     *              Redisson RLock으로 교체. 동작(동일 좌석 동시요청 중 1건만 성공)은 기존과 동일.
+     *              2026-08-18: DB 쓰기는 ReservationCommitter(별도 트랜잭션 빈)로 분리하고,
+     *              알림 발송(SQS)은 트랜잭션·분산락이 모두 끝난 뒤로 옮김 — 느린 외부 통신
+     *              때문에 DB 커넥션/좌석 락을 필요 이상으로 오래 붙잡지 않기 위함.
+     *  param    :  String,Long,Long,Long,String
+     *  return   :   Map<String, Object>
+     ************************************/
+    public Map<String, Object> reserve(String userId, Long reservationId, Long roundId, Long seatId, String queueToken, String clientIp) {
+        String lockKey = "lock:reservation:" + seatId;
+        RLock lock = redissonClient.getLock(lockKey);
+
+        // waitTime=0: 기존 SETNX와 동일하게 "선점 실패 시 대기하지 않고 즉시 실패" 유지.
+        // leaseTime=10초: 기존 TTL(10초)과 동일 — 이 값을 주면 Redisson의 자동 연장(watchdog)이 꺼지고
+        // 정확히 10초 뒤 자동 해제됨. (watchdog을 쓰려면 leaseTime을 아예 생략해야 하는데,
+        // "기존로직 유지" 요구사항이라 TTL을 그대로 고정값 10초로 맞춤 — 코드 리뷰 참고)
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(0, 10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Map.of("success", false, "message", "예매 처리 중 오류가 발생했습니다.");
+        }
+        if (!acquired) {
+            return Map.of("success", false, "message", "이미 다른 사용자가 예매 중인 좌석입니다.");
+        }
+
+        Map<String, Object> result;
+        try {
+            result = reservationCommitter.commitReserve(userId, reservationId, roundId, seatId, queueToken, clientIp);
+        } finally {
+            // isHeldByCurrentThread()로 먼저 확인하는 이유: TTL(10초)이 이미 만료돼서 다른 스레드가
+            // 새로 락을 잡은 상태에서 이 스레드가 뒤늦게 unlock()을 호출하면 IllegalMonitorStateException이
+            // 나거나(Redisson이 소유자 아님을 감지) 최악의 경우 남의 락을 풀어버릴 수 있음 —
+            // 기존 compare-and-delete Lua 스크립트가 하던 일을 Redisson이 이 체크로 대신해줌
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+
+        // 알림 발송은 DB 트랜잭션도 끝나고 분산락도 풀린 다음에 실행 — SQS 통신이 느려져도
+        // 이 좌석을 노리는 다른 요청이나 DB 커넥션 풀에 영향을 안 주도록 함
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            reservationNotificationService.notifyConfirmed(userId, seatId, roundId);
+        }
+        return result;
+    }
+    /***********************************
+     *  이름      :  getMyReservations
+     *  기능      :  내 예매 내역 조회 기능
+     *  param    :  String
+     *  return   :  List<ReservationDTO>
+     ************************************/
+    @Override
+    public List<ReservationDTO> getMyReservations(String userId) {
+        return reservationMapper.findByUserId(userId);
+    }
+
+    /***********************************
+     *  이름      :  getHistoryForAdmin
+     *  기능      :  관리자 "예매 활동 로그" 보고서 — 기간(필수) + 사용자/액션(선택) 필터로
+     *              RESERVATION_HISTORY 조회. 권한 체크는 AdminReservationController가 전담.
+     *  param    :  String,String,String,String
+     *  return   :  List<ReservationDTO>
+     ************************************/
+    @Override
+    public List<ReservationDTO> getHistoryForAdmin(String from, String to, String userId, String action) {
+        return reservationMapper.findHistoryForAdmin(from, to, userId, action);
+    }
+
+    @Override
+    /***********************************
+     *  이름      :  cancel
+     *  기능      :  예매 취소 기능 — 2026-08-18: DB 쓰기는 ReservationCommitter로 분리하고,
+     *              취소 확인 알림(SQS)은 트랜잭션이 끝난 뒤로 옮김(reserve()와 동일한 이유)
+     *  param    :  Long,String
+     *  return   :  Map<String, Object>
+     ************************************/
+    public Map<String, Object> cancel(Long reservationId, String userId, String clientIp) {
+        Map<String, Object> result = reservationCommitter.commitCancel(reservationId, userId, clientIp);
+
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            reservationNotificationService.notifyCancelled(
+                    userId, (Long) result.get("seatId"), (Long) result.get("roundId"));
+        }
+        return result;
+    }
+
+    /***********************************
+     *  이름      :  hasReservation
+     *  기능      :  해당 사용자가 이 회차를 실제로 예매했는지 여부 (감상평 작성 자격 체크용)
+     *  param    :  String, Long
+     *  return   :  boolean
+     ************************************/
+    @Override
+    public boolean hasReservation(String userId, Long roundId) {
+        return reservationMapper.countReservationByRound(userId, roundId) > 0;
+    }
+
+    /***********************************
+     *  이름      :  getReservedRounds
+     *  기능      :  해당 공연에서 사용자가 예매한 회차 목록 (감상평 작성 시 회차 선택 드롭다운용)
+     *  param    :  String, Long
+     *  return   :  List<ReservationDTO>
+     ************************************/
+    @Override
+    public List<ReservationDTO> getReservedRounds(String userId, Long performanceId) {
+        return reservationMapper.findReservedRoundsByPerformance(userId, performanceId);
+    }
+}

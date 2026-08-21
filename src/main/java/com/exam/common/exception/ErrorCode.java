@@ -34,6 +34,13 @@ public enum ErrorCode {
     OAUTH_PROVIDER_ERROR(HttpStatus.BAD_GATEWAY, "A005", "소셜 로그인 처리 중 오류가 발생했습니다."),
     INVALID_OAUTH_STATE(HttpStatus.BAD_REQUEST, "A006", "잘못된 요청입니다. 다시 시도해 주세요."),
 
+    // Auth - 회원가입 이메일 인증 (EmailVerificationController)
+    EMAIL_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "A007", "인증번호가 일치하지 않습니다."),
+    EMAIL_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "A008", "인증번호가 만료되었습니다. 다시 요청해 주세요."),
+    EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "A009", "이메일 인증을 완료해 주세요."),
+    EMAIL_VERIFICATION_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "A010", "인증번호 발송에 실패했습니다. 잠시 후 다시 시도해 주세요."),
+    USER_ID_ALREADY_EXISTS(HttpStatus.CONFLICT, "A011", "이미 사용 중인 아이디입니다."),
+
     // Admin (AdminController)
     ADMIN_ONLY(HttpStatus.FORBIDDEN, "AD001", "관리자 권한이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "AD002", "권한이 없습니다."),
@@ -45,7 +52,12 @@ public enum ErrorCode {
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAY003", "결제 정보를 찾을 수 없습니다."),
     PAYMENT_ALREADY_CANCELED(HttpStatus.BAD_REQUEST, "PAY004", "이미 취소된 결제입니다."),
     PAYMENT_CANCEL_FAILED(HttpStatus.BAD_REQUEST, "PAY005", "결제 취소에 실패했습니다."),
-    PAYMENT_DELETE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "PAY006", "취소(환불)된 결제만 삭제할 수 있습니다.");
+    PAYMENT_DELETE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "PAY006", "취소(환불)된 결제만 삭제할 수 있습니다."),
+
+    // 리뷰 (리뷰컨트롤러)
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REV001", "감상평을 찾을 수 없습니다."),
+    REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "REV002", "이미 이 공연에 감상평을 작성하셨습니다."),
+    REVIEW_WRITE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "REV003", "예매한 공연만 감상평을 작성할 수 있습니다.");
 
     private final HttpStatus status;
     private final String code;

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.review.mapper.ReviewMapper">
+
+    <insert id="save" parameterType="ReviewDTO" useGeneratedKeys="true" keyProperty="reviewId">
+        INSERT INTO REVIEWS (performance_id, round_id, user_id, content, rating, contains_spoiler, ins_id, ins_ip)
+        VALUES (#{performanceId}, #{roundId}, #{userId}, #{content}, #{rating}, #{containsSpoiler}, #{insId}, #{insIp})
+    </insert>
+
+    <select id="findByPerformanceId" resultType="ReviewDTO" parameterType="Long">
+        SELECT r.review_id         AS reviewId,
+               r.performance_id    AS performanceId,
+               r.round_id          AS roundId,
+               r.user_id           AS userId,
+               r.content,
+               r.rating,
+               r.contains_spoiler  AS containsSpoiler,
+               r.use_yn            AS useYn,
+               r.ins_de            AS insDe,
+               u.user_nm           AS userNm,
+               pr.round_time       AS roundTime
+        FROM REVIEWS r
+                 JOIN USERS u ON r.user_id = u.user_id
+                 JOIN PERFORMANCE_ROUND pr ON r.round_id = pr.round_id
+        WHERE r.performance_id = #{performanceId}
+          AND r.use_yn = 'Y'
+        ORDER BY r.ins_de DESC
+    </select>
+
+    <select id="findById" resultType="ReviewDTO" parameterType="Long">
+        SELECT r.review_id         AS reviewId,
+               r.performance_id    AS performanceId,
+               r.round_id          AS roundId,
+               r.user_id           AS userId,
+               r.content,
+               r.rating,
+               r.contains_spoiler  AS containsSpoiler,
+               r.use_yn            AS useYn,
+               r.ins_de            AS insDe,
+               u.user_nm           AS userNm,
+               pr.round_time       AS roundTime
+        FROM REVIEWS r
+                 JOIN USERS u ON r.user_id = u.user_id
+                 JOIN PERFORMANCE_ROUND pr ON r.round_id = pr.round_id
+        WHERE r.review_id = #{reviewId}
+    </select>
+
+    <select id="findByRoundAndUser" resultType="ReviewDTO">
+        SELECT review_id         AS reviewId,
+               performance_id    AS performanceId,
+               round_id          AS roundId,
+               user_id           AS userId,
+               content,
+               rating,
+               contains_spoiler  AS containsSpoiler,
+               use_yn            AS useYn,
+               ins_de            AS insDe
+        FROM REVIEWS
+        WHERE round_id = #{roundId}
+          AND user_id = #{userId}
+    </select>
+
+    <!-- use_yn도 항상 'Y'로 같이 세팅 — 일반 수정에서는 원래 'Y'라 변화 없고,
+         삭제(use_yn='N')됐던 행을 재작성할 때는 이 update로 되살리는 역할까지 함 -->
+    <update id="update" parameterType="ReviewDTO">
+        UPDATE REVIEWS
+        SET content          = #{content},
+            rating           = #{rating},
+            contains_spoiler = #{containsSpoiler},
+            use_yn           = 'Y',
+            upt_id           = #{uptId},
+            upt_ip           = #{uptIp}
+        WHERE review_id = #{reviewId}
+    </update>
+
+    <update id="markDeleted">
+        UPDATE REVIEWS
+        SET use_yn = 'N',
+            upt_id  = #{uptId},
+            upt_ip  = #{uptIp}
+        WHERE review_id = #{reviewId}
+    </update>
+
+</mapper>

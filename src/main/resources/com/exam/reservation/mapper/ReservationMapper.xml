@@ -4,6 +4,12 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.exam.reservation.mapper.ReservationMapper">
 
+    <!--
+         이름            :  save
+         기능            :  좌석 예매 확정 — WHERE절에 user_id IS NULL까지 걸려있어 이미 예매된 좌석이면 0건 갱신되고 실패 처리됨
+                            (ReservationServiceImpl.reserve, Redis 분산 락과 별개로 DB 레벨에서도 동시성을 보장하는 마지막 방어선)
+         parameterType  :  ReservationDTO
+    -->
     <update id="save" parameterType="ReservationDTO">
         UPDATE RESERVATIONS
         SET user_id         = #{userId},
@@ -17,13 +23,36 @@
           AND user_id IS NULL
     </update>
 
+    <!--
+         이름            :  insertHistory
+         기능            :  예매/취소 이력 기록 — reserve()/cancel() 양쪽에서 action(RESERVED/CANCELLED)만 다르게 해서 호출
+         parameterType  :  ReservationDTO
+    -->
     <insert id="insertHistory" parameterType="ReservationDTO">
-        INSERT INTO RESERVATION_HISTORY (user_id, seat_id, round_id, performance_id, action, ins_id, ins_ip)
-        SELECT #{userId}, #{seatId}, #{roundId}, performance_id, #{action}, #{insId}, #{insIp}
+        INSERT INTO RESERVATION_HISTORY (user_id,
+                                         seat_id,
+                                         round_id,
+                                         performance_id,
+                                         action,
+                                         ins_id,
+                                         ins_ip)
+        SELECT #{userId},
+               #{seatId},
+               #{roundId},
+               performance_id,
+               #{action},
+               #{insId},
+               #{insIp}
         FROM PERFORMANCE_ROUND
         WHERE round_id = #{roundId}
     </insert>
 
+    <!--
+         이름            :  findByUserId
+         기능            :  내 예매 내역 조회 — 좌석/회차별 최신 이력(MAX history_id)만 뽑아서 지금 상태를 보여줌(ReservationServiceImpl.getMyReservations)
+         resultType     :  ReservationDTO
+         parameterType  :  String
+    -->
     <select id="findByUserId" resultType="ReservationDTO" parameterType="String">
         SELECT h.history_id      AS historyId,
                r.reservation_id  AS reservationId,
@@ -53,6 +82,12 @@
         ORDER BY h.created_at DESC
     </select>
 
+    <!--
+         이름            :  findById
+         기능            :  예매 단건 조회 — 취소 전 소유자/상태 확인용(ReservationServiceImpl.cancel)
+         resultType     :  ReservationDTO
+         parameterType  :  Long
+    -->
     <select id="findById" resultType="ReservationDTO" parameterType="Long">
         SELECT reservation_id  AS reservationId,
                user_id         AS userId,
@@ -64,6 +99,49 @@
         WHERE reservation_id = #{reservationId}
     </select>
 
+    <!--
+         이름            :  findHistoryForAdmin
+         기능            :  AdminReservationController.getHistory() → 관리자 전용 "예매 활동 로그" 보고서
+                            화면이 쓰는 조회. RESERVATION_HISTORY는 append-only라 몇 번을 예매/취소해도
+                            중간 기록이 안 사라짐 — ins_id/upt_id(마지막 행위자만 남는 감사 컬럼)로는
+                            못 하는 것. userId/action은 선택 필터(안 넘기면 전체), 기간(from~to)은 필수.
+                            ins_ip도 같이 내려줌 — 짧은 시간에 반복 예매/취소하는 어뷰징 패턴을
+                            관리자가 IP까지 보고 판단할 수 있게 하기 위함.
+         resultType     :  ReservationDTO
+    -->
+    <select id="findHistoryForAdmin" resultType="ReservationDTO">
+        SELECT h.history_id      AS historyId,
+               h.user_id         AS userId,
+               h.seat_id         AS seatId,
+               h.round_id        AS roundId,
+               h.action          AS reservedStatus,
+               h.created_at      AS createdReserved,
+               h.ins_ip          AS insIp,
+               s.seat_row        AS seatRow,
+               s.seat_colume     AS seatColume,
+               s.grade,
+               p.p_title         AS pTitle,
+               pr.round_time     AS roundTime
+        FROM RESERVATION_HISTORY h
+                 JOIN SEATS s ON h.seat_id = s.seat_id
+                 JOIN PERFORMANCE_ROUND pr ON h.round_id = pr.round_id
+                 JOIN PERFORMANCES p ON pr.performance_id = p.performance_id
+        WHERE h.created_at &gt;= #{from}
+          AND h.created_at &lt; DATE_ADD(#{to}, INTERVAL 1 DAY)
+          <if test="userId != null and userId != ''">
+            AND h.user_id = #{userId}
+          </if>
+          <if test="action != null and action != ''">
+            AND h.action = #{action}
+          </if>
+        ORDER BY h.created_at DESC
+    </select>
+
+    <!--
+         이름            :  cancel
+         기능            :  예매 취소 — user_id를 NULL로 되돌려 좌석을 AVAILABLE로 반납(ReservationServiceImpl.cancel)
+    -->
+
     <update id="cancel">
         UPDATE RESERVATIONS
         SET user_id         = NULL,
@@ -73,5 +151,42 @@
             upt_ip          = #{uptIp}
         WHERE reservation_id = #{reservationId}
     </update>
+
+    <!--
+         이름            :  findSeatDisplayInfo
+         기능            :  예매확정/취소 알림 메일용 표시정보(공연명/회차시각/좌석) 조회 — ReservationNotificationService가 씀.
+                            SEATS/PERFORMANCE_ROUND는 서로 FK로 안 이어져 있어 조인 조건이 아니라 각자 파라미터로 필터
+         resultType     :  SeatDisplayInfoDTO
+    -->
+    <select id="findSeatDisplayInfo" resultType="SeatDisplayInfoDTO">
+        SELECT s.seat_row    AS seatRow,
+               s.seat_colume AS seatColume,
+               s.grade       AS grade,
+               p.p_title     AS pTitle,
+               pr.round_time AS roundTime
+        FROM SEATS s
+        JOIN PERFORMANCE_ROUND pr ON pr.round_id = #{roundId}
+        JOIN PERFORMANCES p ON pr.performance_id = p.performance_id
+        WHERE s.seat_id = #{seatId}
+    </select>
+
+    <select id="countReservationByRound" resultType="int">
+        SELECT COUNT(*)
+        FROM RESERVATIONS
+        WHERE user_id = #{userId}
+          AND round_id = #{roundId}
+          AND reserved_status = 'RESERVED'
+    </select>
+
+    <select id="findReservedRoundsByPerformance" resultType="ReservationDTO">
+        SELECT DISTINCT r.round_id    AS roundId,
+                        pr.round_time AS roundTime
+        FROM RESERVATIONS r
+                 JOIN PERFORMANCE_ROUND pr ON r.round_id = pr.round_id
+        WHERE r.user_id = #{userId}
+          AND r.performance_id = #{performanceId}
+          AND r.reserved_status = 'RESERVED'
+        ORDER BY pr.round_time
+    </select>
 
 </mapper>

@@ -4,6 +4,7 @@ import lombok.Data;
 import org.apache.ibatis.type.Alias;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Data
 @Alias("UserDTO")
@@ -28,4 +29,5 @@ public class UserDTO implements Serializable {
     private String insIp;
     private String uptId;
     private String uptIp;
+    private LocalDateTime uptDe;
 }

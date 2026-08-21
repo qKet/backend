@@ -1,0 +1,136 @@
+# #######################################
+# CI-main.yml
+# main 브랜치에 push 시 backend 이미지 빌드 + ECR push + qKet/CD write-back까지 담당 — prod용.
+# CI-release.yml과 거의 동일, 다른 점은 트리거 브랜치(main)와 write-back 대상 파일
+# (helm/values-prod.yaml, release는 helm/values-release.yaml)뿐.
+#
+# 배포(CD)는 argoCD가 담당:
+#   - namespace/ingress/networkpolicy → Infra/kubernetes (ArgoCD Application "infra-manifests")
+#   - Deployment/Service              → qKet/CD (ArgoCD Application "qket-cd-prod")
+#
+# qKet/CD write-back 인증: GitHub App(qket-ci-bot, qKet 조직 소유, CD 레포에만 설치,
+# Contents:Read-and-write 권한만) — PAT 대신 이 방식을 쓴 이유는 장기 자격증명을 시크릿에
+# 안 두기 위해서(QKET_CI_APP_PRIVATE_KEY로 실행할 때마다 ~1시간짜리 토큰을 새로 발급받음).
+# #######################################
+name: Build & Push (backend, prod)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC로 AWS 인증하는 데 필요
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: team5/ecr/qket
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    # DemoApplicationTests의 contextLoads()가 스프링 컨텍스트를 통째로 띄우는데, DataSource/Redisson
+    # 빈이 시작 시점에 실제 연결을 시도함 — application.yml의 기본값(DB_HOST/REDIS_HOST 둘 다
+    # localhost)이 CI 러너 안엔 아무것도 없어서 연결 실패로 테스트가 죽었었음(실제로 겪음).
+    # 테스트용으로만 잠깐 떴다 사라지는 컨테이너라 비밀번호(1234)가 노출돼도 무해함 — 로컬
+    # docker-compose랑 값 맞춰서 별도 설정 없이 application.yml 기본값 그대로 연결되게 함.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: "1234"
+          MYSQL_DATABASE: qket
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -p1234"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gradle 빌드
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Test & build jar
+        run: |
+          chmod +x gradlew
+          ./gradlew clean test bootJar --no-daemon
+
+      # 고정 키(AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) 대신 OIDC로 인증 —
+      # 장기 자격증명을 GitHub 시크릿에 안 둠 (CI 도구 선택 ADR에서 결정한 방향).
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 이미지 태그: backend-{커밋SHA 앞 7글자} — release와 같은 ECR 저장소를 공유하되 커밋
+      # SHA가 다르니 태그도 자연히 달라짐(레포별 저장소를 안 나눈 이유는 03_registry/main.tf 참고).
+      - name: Compute image tag
+        id: tag
+        run: echo "tag=backend-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$TAG .
+          docker push $REGISTRY/$ECR_REPOSITORY:$TAG
+          echo "Pushed image: $REGISTRY/$ECR_REPOSITORY:$TAG"
+
+      # qket-ci-bot GitHub App으로 qKet/CD 레포에만 유효한 단명 토큰 발급.
+      - name: Get GitHub App token for CD repo
+        id: cd-app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.QKET_CI_APP_ID }}
+          private-key: ${{ secrets.QKET_CI_APP_PRIVATE_KEY }}
+          owner: qKet
+          repositories: CD
+
+      - name: Checkout qKet/CD
+        uses: actions/checkout@v4
+        with:
+          repository: qKet/CD
+          token: ${{ steps.cd-app-token.outputs.token }}
+          path: cd-repo
+
+      # helm/values-prod.yaml의 "backend:" 블록 안 첫 image 줄만 찾아서 값 교체 — release와
+      # 달리 이 파일은 helm/values-release.yaml 위에 얹히는 오버레이라 image 필드가 명시적으로
+      # 있어야 함(안 그러면 release 값을 그대로 상속해버림, CD/helm/values-prod.yaml 참고).
+      - name: Update image tag in qKet/CD
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$TAG"
+          cd cd-repo
+          sed -i -E "/^backend:/,/^[a-zA-Z]/ s|^(  image: ).*|\1$IMAGE|" helm/values-prod.yaml
+          git config user.name "qket-ci-bot[bot]"
+          git config user.email "qket-ci-bot[bot]@users.noreply.github.com"
+          git add helm/values-prod.yaml
+          git diff --cached --quiet && echo "No image change, skip commit" && exit 0
+          git commit -m "chore: update backend(prod) image to $TAG"
+          git push

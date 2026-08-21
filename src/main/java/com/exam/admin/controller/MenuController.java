@@ -2,8 +2,6 @@ package com.exam.admin.controller;
 
 import com.exam.auth.dto.UserDTO;
 import com.exam.admin.dto.MenuDTO;
-import com.exam.common.exception.BusinessException;
-import com.exam.common.exception.ErrorCode;
 import com.exam.admin.service.MenuService;
 import com.exam.common.util.WebUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,13 +22,7 @@ public class MenuController {
         this.menuService = menuService;
     }
 
-    private UserDTO getLoginUser(HttpSession session) {
-        return (UserDTO) session.getAttribute("loginUser");
-    }
-
-    private boolean isAdmin(UserDTO user) {
-        return user != null && Long.valueOf(3L).equals(user.getRoleId());
-    }
+    // 2026-08-18: 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 미리 걸러줌.
 
     /***********************************
      * URL : "/admin/menus"
@@ -40,8 +32,6 @@ public class MenuController {
      ************************************/
     @GetMapping
     public List<MenuDTO> getMenus(HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         return menuService.getMenus();
     }
 
@@ -54,9 +44,7 @@ public class MenuController {
     @PostMapping
     public Map<String, Object> createMenu(@RequestBody MenuDTO body, HttpSession session,
             HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isAdmin(loginUser))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         body.setInsId(loginUser.getUserId());
         body.setInsIp(WebUtil.getClientIp(request));
         menuService.createMenu(body);
@@ -72,9 +60,7 @@ public class MenuController {
     @PutMapping("/{menuId}")
     public Map<String, Object> updateMenu(@PathVariable Long menuId, @RequestBody MenuDTO body,
             HttpSession session, HttpServletRequest request) {
-        UserDTO loginUser = getLoginUser(session);
-        if (!isAdmin(loginUser))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
+        UserDTO loginUser = WebUtil.getLoginUser(session);
         body.setMenuId(menuId);
         body.setUptId(loginUser.getUserId());
         body.setUptIp(WebUtil.getClientIp(request));
@@ -90,8 +76,6 @@ public class MenuController {
      ************************************/
     @DeleteMapping("/{menuId}")
     public Map<String, Object> deleteMenu(@PathVariable Long menuId, HttpSession session) {
-        if (!isAdmin(getLoginUser(session)))
-            throw new BusinessException(ErrorCode.ADMIN_ONLY);
         menuService.deleteMenu(menuId);
         return Map.of("success", true);
     }
