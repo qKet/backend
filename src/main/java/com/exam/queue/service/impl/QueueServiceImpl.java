@@ -112,14 +112,23 @@ public class QueueServiceImpl implements QueueService {
 
                 admitAvailableUsers(tokenInfo.scheduleId());
 
-                if (repository.isActive(
+                Long expiresAt = repository.getActiveExpiresAt(
                                 tokenInfo.scheduleId(),
-                                queueToken)) {
+                                queueToken);
+
+                if (expiresAt != null) {
+                        // 좌석 선택 화면 카운트다운용 잔여 시간(초). 음수가 나오지 않게 0으로 바닥을 깔아둠 —
+                        // 만료 직후 removeExpiredActive가 아직 안 돈 찰나에 여기 걸릴 수 있음.
+                        long remainingSeconds = Math.max(
+                                        0,
+                                        (expiresAt - System.currentTimeMillis()) / 1000);
+
                         return new QueueStatusResponse(
                                         queueToken,
                                         QueueStatus.ENTERED,
                                         0,
-                                        0);
+                                        0,
+                                        remainingSeconds);
                 }
 
                 Long rank = repository.getWaitingRank(
@@ -137,7 +146,8 @@ public class QueueServiceImpl implements QueueService {
                                 queueToken,
                                 QueueStatus.WAITING,
                                 rank,
-                                estimatedWait);
+                                estimatedWait,
+                                0);
         }
 
         /***********************************
@@ -336,6 +346,7 @@ public class QueueServiceImpl implements QueueService {
                 return new QueueStatusResponse(
                                 token,
                                 QueueStatus.EXPIRED,
+                                0,
                                 0,
                                 0);
         }
