@@ -38,6 +38,9 @@ public class QueueServiceImpl implements QueueService {
         // 같이 넣고 다음 부하테스트로 queue_wait_seconds가 실제로 줄었는지 재측정 필요
         private static final int MAX_ACTIVE_USERS = 400;
 
+        // 대기시간 예상(estimatedWait) 계산용 — 아래 getStatus() 참고
+        private static final long AVG_WAVE_SECONDS = 30;
+
         private static final Duration WAITING_TTL = Duration.ofMinutes(30);
 
         // 2026-08-24: 슬롯 즉시반납(예매 성공/포기/매진/결제실패 시 leave() 호출, 위 MAX_ACTIVE_USERS
@@ -155,7 +158,17 @@ public class QueueServiceImpl implements QueueService {
                         return expired(queueToken);
                 }
 
-                long estimatedWait = Math.max(3, rank * 3);
+                // 2026-08-24: 예전엔 "3초마다 1명씩 입장"을 가정한 rank*3이었는데, 실제로는
+                // MAX_ACTIVE_USERS(400명)만큼 한 번에 몰아서 입장시키는 구조라 이 가정이 완전히
+                // 틀렸음 — 실측(round 62, 833명 대기)에서 순번 832명한테 "약 42분"을 보여줬는데,
+                // 실제로는 active 슬롯이 회전되는 대로 몇 웨이브 안에 다 들어갈 수 있는 상황이었음
+                // (사용자가 화면 보고 "이상하다"고 바로 알아챔). 순번을 웨이브 단위로 환산해서
+                // "내 앞에 웨이브가 몇 번 더 돌아야 하는지 × 웨이브 하나가 도는 평균 시간"으로 재계산.
+                // AVG_WAVE_SECONDS(30초)는 예매실패/이탈 시 슬롯 즉시반납(leaveQueue) 로직을 넣은
+                // 뒤 관찰된 재시도 루프 체감 소요시간(초 단위, 재시도 최대 20회×0.3~0.8초+네트워크)
+                // 기준 추정치 — 정확한 값이 아니라 근사치이므로, 실측 데이터가 쌓이면 조정 필요.
+                long waves = (rank + MAX_ACTIVE_USERS - 1) / MAX_ACTIVE_USERS;
+                long estimatedWait = Math.max(3, waves * AVG_WAVE_SECONDS);
 
                 return new QueueStatusResponse(
                                 queueToken,
