@@ -41,6 +41,11 @@ public enum ErrorCode {
     EMAIL_VERIFICATION_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "A010", "인증번호 발송에 실패했습니다. 잠시 후 다시 시도해 주세요."),
     USER_ID_ALREADY_EXISTS(HttpStatus.CONFLICT, "A011", "이미 사용 중인 아이디입니다."),
 
+    // Auth - 비밀번호 재설정 (UserController, MEM02_LOGIN01)
+    PASSWORD_RESET_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "A012", "아이디와 이메일이 일치하는 계정을 찾을 수 없습니다."),
+    SOCIAL_ACCOUNT_NO_PASSWORD(HttpStatus.BAD_REQUEST, "A013", "소셜 로그인 계정은 비밀번호 재설정을 지원하지 않습니다."),
+    INVALID_RESET_TOKEN(HttpStatus.BAD_REQUEST, "A014", "유효하지 않거나 만료된 링크입니다. 다시 요청해 주세요."),
+
     // Admin (AdminController)
     ADMIN_ONLY(HttpStatus.FORBIDDEN, "AD001", "관리자 권한이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "AD002", "권한이 없습니다."),

@@ -200,6 +200,25 @@ public class RedisQueueRepository {
         return score != null;
     }
 
+    /**
+     * active ZSET의 score가 곧 만료 시각(epoch millis)이라, 그 값을 그대로 돌려줌.
+     * 좌석 선택 화면에 "남은 시간"을 표시하기 위해 2026-08-21 추가 —
+     * 그전엔 프론트가 자기 입장 자격이 언제 끝나는지 알 방법이 아예 없어서,
+     * 고르는 도중 조용히 만료되면 이유도 모른 채 예매가 거부됐음.
+     * 활성 상태가 아니면(대기 중이거나 만료됨) null.
+     */
+    public Long getActiveExpiresAt(
+            Long scheduleId,
+            String token
+    ) {
+        Double score = redisTemplate.opsForZSet().score(
+                activeKey(scheduleId),
+                token
+        );
+
+        return score == null ? null : score.longValue();
+    }
+
     public void removeActive(
             Long scheduleId,
             String token

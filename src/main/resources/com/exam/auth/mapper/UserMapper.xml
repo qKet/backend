@@ -136,4 +136,16 @@
         WHERE user_id = #{userId}
     </update>
 
+    <!--
+         이름            :  updatePwd
+         기능            :  비밀번호 재설정(MEM02_LOGIN01) — 토큰 검증 통과 후 새 비밀번호(암호화된 값)로 교체
+    -->
+    <update id="updatePwd">
+        UPDATE USERS
+        SET pwd    = #{pwd},
+            upt_id = #{uptId},
+            upt_ip = #{uptIp}
+        WHERE user_id = #{userId}
+    </update>
+
 </mapper>

@@ -250,7 +250,10 @@
 
     <!--
          이름            :  hasPassedRound
-         기능            :  이 공연에 예매 오픈 시간이 지난 회차가 하나라도 있는지 — AdminPerformanceController.deletePerformance에서 삭제 가능 여부 판단
+         기능            :  이 공연에 "예매는 열렸지만 공연은 아직 안 끝난"(활성 예매가 있을 수 있는) 회차가
+                            하나라도 있는지 — AdminPerformanceController.deletePerformance에서 삭제 가능 여부 판단.
+                            2026-08-21: 예전엔 open_time만 봐서, 이미 공연 자체가 완전히 끝난(round_time도 지난)
+                            공연까지 영원히 삭제가 안 되는 버그가 있었음(frontend의 isLocked()와 기준을 맞춤).
          resultType     :  boolean
          parameterType  :  Long
     -->
@@ -259,11 +262,14 @@
         FROM PERFORMANCE_ROUND
         WHERE performance_id = #{performanceId}
           AND open_time &lt;= NOW()
+          AND round_time &gt; NOW()
     </select>
 
     <!--
          이름            :  hasPassedRoundById
-         기능            :  이 회차의 예매 오픈 시간이 지났는지 — AdminPerformanceController의 회차 수정/삭제(updateRound, deleteRound)에서 각각 판단
+         기능            :  이 회차가 "예매는 열렸지만 공연은 아직 안 끝난" 상태인지 — AdminPerformanceController의
+                            회차 수정/삭제(updateRound, deleteRound)에서 각각 판단.
+                            2026-08-21: hasPassedRound와 동일한 이유로 round_time 조건 추가.
          resultType     :  boolean
          parameterType  :  Long
     -->
@@ -272,6 +278,7 @@
         FROM PERFORMANCE_ROUND
         WHERE round_id = #{roundId}
           AND open_time &lt;= NOW()
+          AND round_time &gt; NOW()
     </select>
 
     <!--

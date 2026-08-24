@@ -25,7 +25,12 @@ public class AdminAccessInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        String path = request.getRequestURI();
+        // getRequestURI()가 아니라 getServletPath()를 쓰는 이유: getRequestURI()는 context-path(/api)를
+        // 포함한 전체 경로를 반환해서(예: "/api/admin/categories"), "/admin"으로 시작하는지 체크하는
+        // 아래 로직이 절대 매칭이 안 됐음(실제로는 "/api"로 시작하니까) — 그 결과 관리자 API가
+        // 인증 없이 전부 뚫려있었던 치명적 버그였음(2026-08-21 발견). getServletPath()는 context-path를
+        // 제외한 경로("/admin/categories")를 주므로 이 문제가 없음.
+        String path = request.getServletPath();
         // getSession(false): 세션이 없으면 새로 만들지 않고 null 반환 (비로그인 요청 때문에
         // 불필요한 빈 세션이 계속 생기는 걸 방지). 세션 자체가 없으면 당연히 로그인된 사용자도 없음.
         HttpSession session = request.getSession(false);
