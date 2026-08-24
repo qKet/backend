@@ -1,5 +1,6 @@
 package com.exam.auth.controller;
 
+import com.exam.auth.dto.ResetPasswordRequest;
 import com.exam.auth.dto.UserDTO;
 import com.exam.auth.service.UserService;
 import com.exam.common.exception.BusinessException;
@@ -124,5 +125,33 @@ public class UserController {
             result.put("user", user);
         }
         return result;
+    }
+
+    /***********************************
+     *  URL      :  "/auth/password/code"
+     *  이름      :   비밀번호 재설정 인증코드 발송
+     *  기능      :   아이디+이메일이 일치하는 계정에 재설정 링크를 이메일로 발송한다 (MEM02_LOGIN01)
+     *  method   :   POST
+     *  param    :   UserDTO
+     *  result   :   Map<String, Object>
+     ************************************/
+    @PostMapping("/password/code")
+    public Map<String, Object> requestPasswordResetCode(@RequestBody UserDTO userDTO) {
+        userService.requestPasswordResetCode(userDTO.getUserId(), userDTO.getUserEmail());
+        return Map.of("success", true, "message", "비밀번호 재설정 링크를 이메일로 전송했습니다.");
+    }
+
+    /***********************************
+     *  URL      :  "/auth/password/reset"
+     *  이름      :   비밀번호 재설정
+     *  기능      :   이메일로 받은 링크의 토큰을 확인한 뒤 새 비밀번호로 변경한다
+     *  method   :   POST
+     *  param    :   ResetPasswordRequest, HttpServletRequest
+     *  result   :   Map<String, Object>
+     ************************************/
+    @PostMapping("/password/reset")
+    public Map<String, Object> resetPassword(@RequestBody ResetPasswordRequest request, HttpServletRequest servletRequest) {
+        userService.resetPassword(request.getToken(), request.getNewPwd(), WebUtil.getClientIp(servletRequest));
+        return Map.of("success", true, "message", "비밀번호가 재설정되었습니다.");
     }
 }
