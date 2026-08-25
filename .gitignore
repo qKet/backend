@@ -225,3 +225,6 @@ gradle-app.setting
 # local env files
 .env*.local
 .env
+
+# VS Code Java 확장 컴파일 출력 (Gradle build/ 와 별개)
+bin/

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.notification.mapper.OpenAlertMapper">
+
+    <!--
+         이름            :  findUseYn
+         기능            :  로그인 사용자의 해당 회차 구독 상태 조회 — NotificationServiceImpl.isSubscribed, 공연 상세페이지 회차별 버튼 초기 상태용. 구독 이력 없으면 null
+         resultType     :  String
+         parameterType  :  String userId, Long roundId
+    -->
+    <select id="findUseYn" resultType="String">
+        SELECT use_yn
+        FROM OPEN_ALERTS
+        WHERE user_id = #{userId}
+          AND round_id = #{roundId}
+    </select>
+
+    <!--
+         이름            :  upsert
+         기능            :  구독/구독해지 토글 — NotificationServiceImpl.subscribe/unsubscribe. (user_id, round_id) 유니크라
+                            같은 회차를 여러 번 눌러도 행이 늘어나지 않고 use_yn만 바뀜. notified_yn은 안 건드림
+                            (이미 보낸 뒤 껐다 켜도 다시 발송하지 않음 — open_time은 이미 지났거나 임박했을 것이므로)
+         parameterType  :  OpenAlertDTO
+    -->
+    <insert id="upsert" parameterType="OpenAlertDTO">
+        INSERT INTO OPEN_ALERTS (user_id, round_id, use_yn, ins_id, ins_ip)
+        VALUES (#{userId}, #{roundId}, #{useYn}, #{insId}, #{insIp})
+        ON DUPLICATE KEY UPDATE
+            use_yn = #{useYn},
+            upt_id = #{insId},
+            upt_ip = #{insIp}
+    </insert>
+
+    <!--
+         이름            :  findDueAlerts
+         기능            :  open_time이 [now, windowEnd] 사이로 다가왔고 아직 안 보낸(notified_yn='N') 구독 조회 —
+                            NotificationServiceImpl의 @Scheduled 스위퍼(5분 주기)가 씀.
+                            DB 서버의 NOW()를 쓰지 않고 JVM이 계산한 값을 파라미터로 받는 이유는
+                            OpenAlertMapper.findDueAlerts 주석 참고 (RDS 시간대가 UTC라 NOW() 쓰면 항상 매칭 실패했음)
+         resultType     :  OpenAlertRecipientDTO
+         parameterType  :  LocalDateTime now, LocalDateTime windowEnd
+    -->
+    <select id="findDueAlerts" resultType="OpenAlertRecipientDTO">
+        SELECT oa.alert_id  AS alertId,
+               u.user_email AS userEmail,
+               p.p_title    AS pTitle,
+               v.venue_name AS venueName,
+               pr.open_time AS openTime,
+               pr.round_time AS roundTime
+        FROM OPEN_ALERTS oa
+        JOIN USERS u ON oa.user_id = u.user_id
+        JOIN PERFORMANCE_ROUND pr ON oa.round_id = pr.round_id
+        JOIN PERFORMANCES p ON pr.performance_id = p.performance_id
+        JOIN VENUE v ON p.venue_id = v.venue_id
+        WHERE oa.use_yn = 'Y'
+          AND oa.notified_yn = 'N'
+          AND pr.open_time BETWEEN #{now} AND #{windowEnd}
+    </select>
+
+    <!--
+         이름            :  markNotified
+         기능            :  발송 완료 표시 — 스위퍼가 SQS publish에 성공한 직후 호출. 다음 스위프 때 같은 구독자한테
+                            중복 발송되는 걸 막음
+         parameterType  :  Long
+    -->
+    <update id="markNotified">
+        UPDATE OPEN_ALERTS
+        SET notified_yn = 'Y'
+        WHERE alert_id = #{alertId}
+    </update>
+
+    <!--
+         이름            :  deleteByRoundId
+         기능            :  회차 삭제 캐스케이드 — AdminPerformanceController.deleteRound. round_id FK라 회차 삭제 전에 먼저 지워야 함
+         parameterType  :  Long
+    -->
+    <delete id="deleteByRoundId">
+        DELETE FROM OPEN_ALERTS
+        WHERE round_id = #{roundId}
+    </delete>
+
+    <!--
+         이름            :  deleteByPerformanceId
+         기능            :  공연 삭제 캐스케이드 — AdminPerformanceController.deletePerformance. OPEN_ALERTS는 round_id만 갖고 있어서
+                            PERFORMANCE_ROUND를 거쳐 해당 공연 소속 회차를 찾아 지움 (회차 삭제 전에 먼저 지워야 FK 위반 안 남)
+         parameterType  :  Long
+    -->
+    <delete id="deleteByPerformanceId">
+        DELETE oa FROM OPEN_ALERTS oa
+        JOIN PERFORMANCE_ROUND pr ON oa.round_id = pr.round_id
+        WHERE pr.performance_id = #{performanceId}
+    </delete>
+
+</mapper>

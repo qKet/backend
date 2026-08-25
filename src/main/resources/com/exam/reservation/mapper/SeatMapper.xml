@@ -4,6 +4,12 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.exam.reservation.mapper.SeatMapper">
 
+    <!--
+         이름            :  findByRoundId
+         기능            :  회차별 좌석 전체 조회(현재 예약 상태 포함) — SeatServiceImpl.getSeatsByRound, 좌석 배치도 화면용
+         resultType     :  SeatDTO
+         parameterType  :  Long
+    -->
     <select id="findByRoundId" resultType="SeatDTO" parameterType="Long">
         SELECT r.reservation_id AS reservationId,
                 s.seat_id        AS seatId,
@@ -14,9 +20,16 @@
         FROM RESERVATIONS r
         JOIN SEATS s ON r.seat_id = s.seat_id
         WHERE r.round_id = #{roundId}
-        ORDER BY s.seat_row, s.seat_colume
+        ORDER BY s.seat_row,
+                 s.seat_colume
     </select>
 
+    <!--
+         이름            :  findById
+         기능            :  좌석 단건 조회 — SeatServiceImpl.getSeat, PaymentServiceImpl.confirm에서 결제 금액 검증(등급별 가격 대조)용으로도 쓰임
+         resultType     :  SeatDTO
+         parameterType  :  Long
+    -->
     <select id="findById" resultType="SeatDTO" parameterType="Long">
         SELECT seat_id     AS seatId,
                seat_row    AS seatRow,
@@ -25,11 +38,5 @@
         FROM SEATS
         WHERE seat_id = #{seatId}
     </select>
-
-    <update id="updateStatus">
-        UPDATE SEATS
-        SET status = #{status}
-        WHERE seat_id = #{seatId}
-    </update>
 
 </mapper>

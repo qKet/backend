@@ -20,28 +20,89 @@
         </collection>
     </resultMap>
 
+    <!--
+         이름            :  findAllVenues
+         기능            :  공연장 목록 조회 — AdminPerformanceController./venues, 공연 등록 폼 드롭다운용
+         resultType     :  VenueDTO
+    -->
     <select id="findAllVenues" resultType="VenueDTO">
-        SELECT venue_id AS venueId, venue_name AS venueName FROM VENUE ORDER BY venue_id
+        SELECT venue_id AS venueId,
+               venue_name AS venueName
+        FROM VENUE
+        ORDER BY venue_id
     </select>
 
+    <!--
+         이름            :  insert
+         기능            :  신규 공연 저장 — AdminPerformanceController.createPerformance, 이후 각 회차는 insertRound로 별도 저장
+         parameterType  :  PerformanceDTO
+    -->
     <insert id="insert" parameterType="PerformanceDTO" useGeneratedKeys="true" keyProperty="performanceId">
-        INSERT INTO PERFORMANCES (p_title, venue_id, category_id, poster_url, ins_id, ins_ip)
-        VALUES (#{pTitle}, #{venueId}, #{categoryId}, #{posterUrl}, #{insId}, #{insIp})
+        INSERT INTO PERFORMANCES (p_title,
+                                  venue_id,
+                                  category_id,
+                                  poster_url,
+                                  ins_id,
+                                  ins_ip)
+        VALUES (#{pTitle},
+                #{venueId},
+                #{categoryId},
+                #{posterUrl},
+                #{insId},
+                #{insIp})
     </insert>
 
+    <!--
+         이름            :  insertRound
+         기능            :  공연 회차 저장 — 공연 등록(createPerformance)/회차 추가(addRound) 둘 다에서 호출, 상태는 항상 OPEN으로 시작
+         parameterType  :  RoundDTO
+    -->
     <insert id="insertRound" parameterType="RoundDTO" useGeneratedKeys="true" keyProperty="roundId">
-        INSERT INTO PERFORMANCE_ROUND (performance_id, round_time, open_time, round_status, ins_id, ins_ip)
-        VALUES (#{performanceId}, #{roundTime}, #{openTime}, 'OPEN', #{insId}, #{insIp})
+        INSERT INTO PERFORMANCE_ROUND (performance_id,
+                                       round_time,
+                                       open_time,
+                                       round_status,
+                                       ins_id,
+                                       ins_ip)
+        VALUES (#{performanceId},
+                #{roundTime},
+                #{openTime},
+                'OPEN',
+                #{insId},
+                #{insIp})
     </insert>
 
+    <!--
+         이름            :  initReservationSlots
+         기능            :  해당 회차의 좌석마다 예약 슬롯(RESERVATIONS 행)을 AVAILABLE로 미리 생성 — insertRound 직후 항상 같이 호출됨
+                            (회차 생성 시점에 좌석 수만큼 빈 예약 행을 만들어둬야, 실제 예매는 INSERT가 아니라 UPDATE로 처리됨)
+    -->
     <insert id="initReservationSlots">
-        INSERT INTO RESERVATIONS (user_id, seat_id, round_id, performance_id, reserved_status, ins_id, ins_ip)
-        SELECT NULL, s.seat_id, #{roundId}, #{performanceId}, 'AVAILABLE', #{insId}, #{insIp}
+        INSERT INTO RESERVATIONS (user_id,
+                                  seat_id,
+                                  round_id,
+                                  performance_id,
+                                  reserved_status,
+                                  ins_id,
+                                  ins_ip)
+        SELECT NULL,
+               s.seat_id,
+               #{roundId},
+               #{performanceId},
+               'AVAILABLE',
+               #{insId},
+               #{insIp}
         FROM SEATS s
         JOIN PERFORMANCES p ON s.venue_id = p.venue_id
         WHERE p.performance_id = #{performanceId}
     </insert>
 
+    <!--
+         이름            :  findAll
+         기능            :  공연 목록 조회(카테고리/키워드 필터) — PerformanceServiceImpl.getAllPerformances
+                            회차가 여러 개인 공연은 JOIN으로 행이 늘어났다가 resultMap(performanceMap)의 collection으로 다시 묶임
+         resultMap      :  performanceMap
+    -->
     <select id="findAll" resultMap="performanceMap">
         SELECT  A.performance_id,
                 A.venue_id,
@@ -69,18 +130,24 @@
     </select>
 
 
+    <!--
+         이름            :  findById
+         기능            :  공연 상세 조회(회차 포함) — PerformanceServiceImpl.getPerformanceDetail, 캐스팅은 findCastsByPerformanceId로 별도 조회해서 합침
+         resultMap      :  performanceMap
+         parameterType  :  Long
+    -->
     <!-- 캐스팅 -->
     <select id="findById" parameterType="Long" resultMap="performanceMap">
         SELECT  A.performance_id,
-        A.venue_id,
-        A.p_title,
-        V.venue_name,
-        A.poster_url,
-        A.created_per,
-        B.round_id,
-        B.round_time,
-        B.open_time,
-        B.round_status
+                A.venue_id,
+                A.p_title,
+                V.venue_name,
+                A.poster_url,
+                A.created_per,
+                B.round_id,
+                B.round_time,
+                B.open_time,
+                B.round_status
         FROM PERFORMANCES A
         LEFT OUTER JOIN VENUE V ON A.venue_id = V.venue_id
         LEFT OUTER JOIN PERFORMANCE_ROUND B ON A.performance_id = B.performance_id
@@ -88,6 +155,12 @@
         ORDER BY B.round_time
     </select>
 
+    <!--
+         이름            :  findCastsByPerformanceId
+         기능            :  공연 캐스팅 목록 — getPerformanceDetail에서 findById 뒤에 별도로 채워 넣음
+         resultType     :  CastDTO
+         parameterType  :  Long
+    -->
     <select id="findCastsByPerformanceId" parameterType="Long" resultType="CastDTO">
         SELECT cast_id AS castId,
                performance_id AS performanceId,
@@ -100,6 +173,11 @@
         ORDER BY sort_order, cast_id
     </select>
 
+    <!--
+         이름            :  findRoundsByMonth
+         기능            :  달력 화면에서 보고 있는 달의 회차만 조회 — PerformanceServiceImpl.getRoundsByMonth
+         resultType     :  RoundDTO
+    -->
     <select id="findRoundsByMonth" resultType="RoundDTO">
         SELECT round_id AS roundId,
                 performance_id AS performanceId,
@@ -112,8 +190,13 @@
         ORDER BY round_time
     </select>
 
+    <!--
+         이름            :  findAllPaged
+         기능            :  메인 화면 페이지네이션용 공연 목록 — PerformanceServiceImpl.getPerformances
+         resultMap      :  performanceMap
+    -->
     <!-- 페이지네이션용: PERFORMANCES 를 먼저 LIMIT/OFFSET 으로 자른 뒤 회차(PERFORMANCE_ROUND)를 재조인.
-         findAll처럼 조인 후에 바로 LIMIT을 걸면 회차가 여러 개인 공연이 페이지 경계에서 잘릴 수 있어서
+          findAll처럼 조인 후에 바로 LIMIT을 걸면 회차가 여러 개인 공연이 페이지 경계에서 잘릴 수 있어서
          이렇게 서브쿼리로 공연 단위 페이지를 먼저 확정한다. -->
     <select id="findAllPaged" resultMap="performanceMap">
         SELECT  A.performance_id,
@@ -144,9 +227,15 @@
         LEFT OUTER JOIN VENUE V ON A.venue_id = V.venue_id
         LEFT OUTER JOIN CATEGORIES C ON A.category_id = C.category_id
         LEFT OUTER JOIN PERFORMANCE_ROUND B ON A.performance_id = B.performance_id
-        ORDER BY A.created_per DESC, B.round_time ASC
+        ORDER BY A.created_per DESC,
+                 B.round_time ASC
     </select>
 
+    <!--
+         이름            :  countAll
+         기능            :  findAllPaged와 같은 필터 조건의 전체 건수 — PageResponse의 totalCount 계산용(PerformanceServiceImpl.getPerformances)
+         resultType     :  long
+    -->
     <select id="countAll" resultType="long">
         SELECT COUNT(*)
         FROM PERFORMANCES P
@@ -159,16 +248,44 @@
         </where>
     </select>
 
+    <!--
+         이름            :  hasPassedRound
+         기능            :  이 공연에 "예매는 열렸지만 공연은 아직 안 끝난"(활성 예매가 있을 수 있는) 회차가
+                            하나라도 있는지 — AdminPerformanceController.deletePerformance에서 삭제 가능 여부 판단.
+                            2026-08-21: 예전엔 open_time만 봐서, 이미 공연 자체가 완전히 끝난(round_time도 지난)
+                            공연까지 영원히 삭제가 안 되는 버그가 있었음(frontend의 isLocked()와 기준을 맞춤).
+         resultType     :  boolean
+         parameterType  :  Long
+    -->
     <select id="hasPassedRound" parameterType="Long" resultType="boolean">
-        SELECT COUNT(*) > 0 FROM PERFORMANCE_ROUND
-        WHERE performance_id = #{performanceId} AND open_time &lt;= NOW()
+        SELECT COUNT(*) > 0
+        FROM PERFORMANCE_ROUND
+        WHERE performance_id = #{performanceId}
+          AND open_time &lt;= NOW()
+          AND round_time &gt; NOW()
     </select>
 
+    <!--
+         이름            :  hasPassedRoundById
+         기능            :  이 회차가 "예매는 열렸지만 공연은 아직 안 끝난" 상태인지 — AdminPerformanceController의
+                            회차 수정/삭제(updateRound, deleteRound)에서 각각 판단.
+                            2026-08-21: hasPassedRound와 동일한 이유로 round_time 조건 추가.
+         resultType     :  boolean
+         parameterType  :  Long
+    -->
     <select id="hasPassedRoundById" parameterType="Long" resultType="boolean">
-        SELECT COUNT(*) > 0 FROM PERFORMANCE_ROUND
-        WHERE round_id = #{roundId} AND open_time &lt;= NOW()
+        SELECT COUNT(*) > 0
+        FROM PERFORMANCE_ROUND
+        WHERE round_id = #{roundId}
+          AND open_time &lt;= NOW()
+          AND round_time &gt; NOW()
     </select>
 
+    <!--
+         이름            :  updatePerformance
+         기능            :  공연 정보 수정(제목/포스터/카테고리) — AdminPerformanceController.updatePerformance, 회차는 updateRound로 별도 처리
+         parameterType  :  PerformanceDTO
+    -->
     <update id="updatePerformance" parameterType="PerformanceDTO">
         UPDATE PERFORMANCES
         <set>
@@ -181,37 +298,80 @@
         WHERE performance_id = #{performanceId}
     </update>
 
+    <!--
+         이름            :  deleteReservationHistoryByPerformanceId
+         기능            :  공연 삭제 시 하위 예약 이력 먼저 삭제 — AdminPerformanceController.deletePerformance의 FK 정리 1단계
+    -->
     <delete id="deleteReservationHistoryByPerformanceId">
-        DELETE FROM RESERVATION_HISTORY WHERE performance_id = #{performanceId}
+        DELETE FROM RESERVATION_HISTORY
+        WHERE performance_id = #{performanceId}
     </delete>
 
+    <!--
+         이름            :  deleteReservationsByPerformanceId
+         기능            :  공연 삭제 시 하위 예약(빈 슬롯 포함) 삭제 — deletePerformance FK 정리 2단계
+    -->
     <delete id="deleteReservationsByPerformanceId">
-        DELETE FROM RESERVATIONS WHERE performance_id = #{performanceId}
+        DELETE FROM RESERVATIONS
+        WHERE performance_id = #{performanceId}
     </delete>
 
+    <!--
+         이름            :  deleteRoundsByPerformanceId
+         기능            :  공연 삭제 시 하위 회차 삭제 — deletePerformance FK 정리 3단계
+    -->
     <delete id="deleteRoundsByPerformanceId">
-        DELETE FROM PERFORMANCE_ROUND WHERE performance_id = #{performanceId}
+        DELETE FROM PERFORMANCE_ROUND
+        WHERE performance_id = #{performanceId}
     </delete>
 
+    <!--
+         이름            :  deletePerformance
+         기능            :  공연 삭제 — 위 3개(이력/예약/회차)를 먼저 지운 뒤 마지막에 호출됨. hasPassedRound로 오픈된 회차 없음을 미리 확인함
+    -->
     <delete id="deletePerformance">
-        DELETE FROM PERFORMANCES WHERE performance_id = #{performanceId}
+        DELETE FROM PERFORMANCES
+        WHERE performance_id = #{performanceId}
     </delete>
 
+    <!--
+         이름            :  deleteReservationHistoryByRoundId
+         기능            :  회차 삭제 시 하위 예약 이력 먼저 삭제 — AdminPerformanceController.deleteRound의 FK 정리 1단계
+    -->
     <delete id="deleteReservationHistoryByRoundId">
-        DELETE FROM RESERVATION_HISTORY WHERE round_id = #{roundId}
+        DELETE FROM RESERVATION_HISTORY
+        WHERE round_id = #{roundId}
     </delete>
 
+    <!--
+         이름            :  deleteReservationsByRoundId
+         기능            :  회차 삭제 시 하위 예약 삭제 — deleteRound FK 정리 2단계
+    -->
     <delete id="deleteReservationsByRoundId">
-        DELETE FROM RESERVATIONS WHERE round_id = #{roundId}
+        DELETE FROM RESERVATIONS
+        WHERE round_id = #{roundId}
     </delete>
 
+    <!--
+         이름            :  deleteRound
+         기능            :  회차 삭제 — 위 2개를 먼저 지운 뒤 호출됨. hasPassedRoundById로 오픈 시간 안 지났음을 미리 확인함
+    -->
     <delete id="deleteRound">
-        DELETE FROM PERFORMANCE_ROUND WHERE round_id = #{roundId}
+        DELETE FROM PERFORMANCE_ROUND
+        WHERE round_id = #{roundId}
     </delete>
 
+    <!--
+         이름            :  updateRound
+         기능            :  회차 시간 수정 — 공연 수정(updatePerformance) 흐름과 회차 단독 수정 엔드포인트 양쪽에서 호출, 둘 다 hasPassedRoundById로 오픈 여부 먼저 확인
+         parameterType  :  RoundDTO
+    -->
     <update id="updateRound" parameterType="RoundDTO">
         UPDATE PERFORMANCE_ROUND
-        SET round_time = #{roundTime}, open_time = #{openTime}, upt_id = #{uptId}, upt_ip = #{uptIp}
+        SET round_time = #{roundTime},
+            open_time = #{openTime},
+            upt_id = #{uptId},
+            upt_ip = #{uptIp}
         WHERE round_id = #{roundId}
     </update>
 

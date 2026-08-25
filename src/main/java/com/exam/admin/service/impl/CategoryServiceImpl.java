@@ -1,7 +1,8 @@
-package com.exam.admin.service;
+package com.exam.admin.service.impl;
 
 import com.exam.admin.dto.CategoryDTO;
 import com.exam.admin.mapper.CategoryMapper;
+import com.exam.admin.service.CategoryService;
 import com.exam.common.exception.BusinessException;
 import com.exam.common.exception.ErrorCode;
 import org.springframework.stereotype.Service;

@@ -215,6 +215,29 @@ CREATE TABLE IF NOT EXISTS RESERVATION_HISTORY (
     FOREIGN KEY (performance_id) REFERENCES PERFORMANCES(performance_id)
 );
 
+-- OPEN_ALERTS: 예매 오픈 알림 — 회차 단위 구독. use_yn 토글로 켜고 끔(행 자체는 안 지움)
+-- 같은 회차를 여러 번 눌러도(구독 취소 후 재구독 등) 행이 늘어나지 않게 (user_id, round_id) 유니크 + UPSERT로 처리
+-- notified_yn: NotificationServiceImpl의 5분 주기 스케줄러가 "open_time 30분 전" 발송을 이미 했는지 표시
+--   (스케줄러가 5분마다 도는데 표시가 없으면 같은 구독자한테 여러 번 중복 발송될 수 있어서 필요)
+CREATE TABLE IF NOT EXISTS OPEN_ALERTS (
+    alert_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(50) NOT NULL,
+    round_id BIGINT NOT NULL,
+    use_yn CHAR(1) NOT NULL DEFAULT 'Y',
+    notified_yn CHAR(1) NOT NULL DEFAULT 'N',
+
+    ins_id VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    ins_ip VARCHAR(45) NULL,
+    ins_de DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    upt_id VARCHAR(50) NULL,
+    upt_ip VARCHAR(45) NULL,
+    upt_de DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES USERS (user_id),
+    FOREIGN KEY (round_id) REFERENCES PERFORMANCE_ROUND (round_id),
+    UNIQUE KEY uk_open_alerts_user_round (user_id, round_id)
+);
+
 -- PROGRAMS: 프로그램관리 — 프론트 화면(라우트) 등록. program_type: 'MENU'(네비게이션에 노출) / 'PAGE'(URL 접근만, 메뉴 미노출)
 CREATE TABLE IF NOT EXISTS PROGRAMS (
     program_id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -237,6 +260,7 @@ CREATE TABLE IF NOT EXISTS PROGRAMS (
 CREATE TABLE IF NOT EXISTS ROLE_PROGRAMS (
     role_id BIGINT NOT NULL,
     program_id BIGINT NOT NULL,
+    use_yn CHAR(1) NOT NULL DEFAULT 'Y', -- 체크 해제 시 행을 지우지 않고 'N'으로만 바꿔서 최종수정자/일 기록을 보존(소프트 삭제)
 
     ins_id VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
     ins_ip VARCHAR(45) NULL,
@@ -295,6 +319,32 @@ CREATE TABLE IF NOT EXISTS PAYMENTS (
     FOREIGN KEY (user_id) REFERENCES USERS (user_id),
     UNIQUE KEY uk_payments_order_id (order_id),
     UNIQUE KEY uk_payments_payment_key (payment_key)
+);
+
+-- REVIEWS: 공연 감상평(REV01). 회차(round) 단위로 사용자 1인 1개만 허용(UNIQUE) — 같은 공연도
+-- 회차를 여러 번 예매해서 봤으면 회차별로 따로 작성 가능. performance_id는 조회 편의를 위한 비정규화
+-- 컬럼(RESERVATIONS 테이블과 동일한 패턴). 삭제는 물리삭제 아니고 use_yn='N' 소프트 삭제
+CREATE TABLE IF NOT EXISTS REVIEWS (
+    review_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    performance_id BIGINT NOT NULL,
+    round_id BIGINT NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+    content TEXT NOT NULL,
+    rating TINYINT NOT NULL DEFAULT 5 CHECK (rating BETWEEN 1 AND 5),
+    contains_spoiler CHAR(1) NOT NULL DEFAULT 'N',
+    use_yn CHAR(1) NOT NULL DEFAULT 'Y',
+
+    ins_id VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    ins_ip VARCHAR(45) NULL,
+    ins_de DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    upt_id VARCHAR(50) NULL,
+    upt_ip VARCHAR(45) NULL,
+    upt_de DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (performance_id) REFERENCES PERFORMANCES (performance_id),
+    FOREIGN KEY (round_id) REFERENCES PERFORMANCE_ROUND (round_id),
+    FOREIGN KEY (user_id) REFERENCES USERS (user_id),
+    UNIQUE KEY uk_reviews_round_user (round_id, user_id)
 );
 
 SHOW TABLES;

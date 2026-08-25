@@ -1,8 +1,9 @@
-package com.exam.auth.service;
+package com.exam.auth.service.impl;
 
 import com.exam.auth.dto.UserDTO;
 import com.exam.auth.mapper.UserMapper;
 import com.exam.auth.oauth.OAuthUserInfo;
+import com.exam.auth.service.OAuthService;
 import com.exam.common.exception.BusinessException;
 import com.exam.common.exception.ErrorCode;
 import com.exam.common.util.WebUtil;
