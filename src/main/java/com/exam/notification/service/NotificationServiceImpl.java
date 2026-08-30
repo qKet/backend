@@ -96,8 +96,8 @@ public class NotificationServiceImpl implements NotificationService {
     @Scheduled(fixedRate = 5 * 60 * 1000)
     public void sweepOpenAlerts() {
         boolean queueConfigured = StringUtils.hasText(openAlertQueueUrl);
-        // DB 서버(RDS)의 NOW()가 아니라 JVM 시각(TZ=Asia/Seoul 고정됨)을 기준으로 윈도우를 계산해서 넘김 —
-        // RDS 시간대가 UTC라 DB의 NOW()를 그대로 쓰면 KST로 저장된 open_time과 9시간 어긋나서 항상 빈 결과가 나왔음(2026-08-18 발견)
+        // DB 서버(RDS)의 NOW()가 아니라 JVM 시각(TZ=Asia/Seoul 고정)을 기준으로 윈도우를 계산해서
+        // 넘김 — RDS는 UTC라 NOW()를 쓰면 KST로 저장된 open_time과 9시간 어긋나 항상 빈 결과가 나옴.
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime windowEnd = now.plusMinutes(minutesBefore);
         List<OpenAlertRecipientDTO> dueAlerts = openAlertMapper.findDueAlerts(now, windowEnd);

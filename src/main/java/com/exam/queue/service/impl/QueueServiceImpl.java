@@ -24,18 +24,9 @@ import java.util.UUID;
 @Service
 public class QueueServiceImpl implements QueueService {
 
-        // private static final int MAX_ACTIVE_USERS = 0; // TEMP: 순번 화면 테스트용
-        // 2026-08-19: 2000명 규모 부하테스트에서 10으로는 ACTIVE_TTL(10분) 동안 처리 가능한 인원이
-        // 너무 적어(초당 10/600 명 수준) 테스트 시간 내에 아무도 대기열을 못 벗어나는 현상 확인 —
-        // 150으로 우선 상향 후 재측정
-        // 2026-08-24: 150에서도 여전히 대기열 진입까지 평균 9.5분(p95 10.7분) 걸림 — 좌석을 못 구한
-        // 사람도 ACTIVE_TTL(10분)을 다 채우고 나서야 다음 웨이브가 들어가는 구조라(예매 실패/매진
-        // 시 슬롯을 바로 반납하는 로직이 없었음, 이번에 QueueModal 패턴을 좌석선택/결제실패 화면까지
-        // 확장해서 같이 고침) 첫 웨이브 자체가 너무 작았던 것도 원인. 8/24 2000명 테스트에서 backend
-        // 8replica(각 1코어)가 실제 요청 실패 0건으로 그 이상 규모도 버텨낸 걸 확인했으므로(CloudWatch
-        // TargetConnectionErrorCount 0, 5xx 13건뿐 — CLAUDE_LLM_WIKI troubleshooting/
-        // backend-cold-start-cpu-contention-during-rollout 참고), 400으로 상향 — 슬롯 즉시반납 로직과
-        // 같이 넣고 다음 부하테스트로 queue_wait_seconds가 실제로 줄었는지 재측정 필요
+        // 2000명 부하테스트 기준 값 — 슬롯 즉시반납 로직(예매 성공/포기/매진/결제실패 시 leave())과
+        // 같이 넣어서 400까지 상향(backend 8replica가 실패 0건으로 버텨낸 걸 확인). 다음 부하테스트로
+        // queue_wait_seconds가 실제로 줄었는지 재측정 필요.
         private static final int MAX_ACTIVE_USERS = 400;
 
         // 대기시간 예상(estimatedWait) 계산용 — 아래 getStatus() 참고
@@ -43,13 +34,8 @@ public class QueueServiceImpl implements QueueService {
 
         private static final Duration WAITING_TTL = Duration.ofMinutes(30);
 
-        // 2026-08-24: 슬롯 즉시반납(예매 성공/포기/매진/결제실패 시 leave() 호출, 위 MAX_ACTIVE_USERS
-        // 주석 및 QueueModal.tsx/seats page/payments fail page 참고)을 넣은 뒤로는 이 TTL이 처리량을
-        // 좌우하는 값이 아니라, "beforeunload가 안 뜨는 경우"(브라우저 강제종료, 모바일 사파리는
-        // beforeunload가 원래 잘 안 뜸, 네트워크 끊김 등)에 대한 안전망 역할로 축소됨 — 그래서
-        // 10분→5분으로만 줄임(결제위젯에서 카드정보 입력+확인까지 정상 유저 소요시간을 침범하지
-        // 않을 정도). 더 공격적으로 줄이는 건 안전망 타이트닝 대비 "결제 중간에 쫓겨나는" 리스크가
-        // 더 커서 보류.
+        // 슬롯 즉시반납 로직이 들어온 뒤로는 이 TTL이 처리량을 좌우하지 않고, beforeunload가 안 뜨는
+        // 경우(강제종료, 네트워크 끊김)에 대한 안전망 역할 — 결제위젯 소요시간을 안 침범할 정도로 5분.
         private static final Duration ACTIVE_TTL = Duration.ofMinutes(5);
 
         private final RedisQueueRepository repository;
@@ -158,15 +144,9 @@ public class QueueServiceImpl implements QueueService {
                         return expired(queueToken);
                 }
 
-                // 2026-08-24: 예전엔 "3초마다 1명씩 입장"을 가정한 rank*3이었는데, 실제로는
-                // MAX_ACTIVE_USERS(400명)만큼 한 번에 몰아서 입장시키는 구조라 이 가정이 완전히
-                // 틀렸음 — 실측(round 62, 833명 대기)에서 순번 832명한테 "약 42분"을 보여줬는데,
-                // 실제로는 active 슬롯이 회전되는 대로 몇 웨이브 안에 다 들어갈 수 있는 상황이었음
-                // (사용자가 화면 보고 "이상하다"고 바로 알아챔). 순번을 웨이브 단위로 환산해서
-                // "내 앞에 웨이브가 몇 번 더 돌아야 하는지 × 웨이브 하나가 도는 평균 시간"으로 재계산.
-                // AVG_WAVE_SECONDS(30초)는 예매실패/이탈 시 슬롯 즉시반납(leaveQueue) 로직을 넣은
-                // 뒤 관찰된 재시도 루프 체감 소요시간(초 단위, 재시도 최대 20회×0.3~0.8초+네트워크)
-                // 기준 추정치 — 정확한 값이 아니라 근사치이므로, 실측 데이터가 쌓이면 조정 필요.
+                // rank*3(3초마다 1명 입장 가정)은 MAX_ACTIVE_USERS만큼 한 번에 몰아서 입장시키는 구조와
+                // 안 맞아서 순번을 웨이브 단위로 환산 — "앞으로 웨이브가 몇 번 더 돌아야 하는지 ×
+                // 웨이브 평균 시간". AVG_WAVE_SECONDS는 관찰 기반 근사치, 실측 데이터 쌓이면 조정 필요.
                 long waves = (rank + MAX_ACTIVE_USERS - 1) / MAX_ACTIVE_USERS;
                 long estimatedWait = Math.max(3, waves * AVG_WAVE_SECONDS);
 

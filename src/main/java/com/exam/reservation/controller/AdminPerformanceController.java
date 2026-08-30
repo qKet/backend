@@ -34,9 +34,8 @@ public class AdminPerformanceController {
         this.openAlertMapper = openAlertMapper;
     }
 
-    // 2026-08-18: 로그인 여부/역할(매니저 이상) 체크는 이제 AdminAccessInterceptor가
-    // 컨트롤러 진입 전에 미리 걸러줌 (여기 매핑 경로가 "/manage/**"라서 자동으로 적용됨).
-    // 아래 메서드들에서 getLoginUser는 "이미 검증된 로그인 사용자 정보를 꺼내 쓰는 용도"로만 남겨둠.
+    // 로그인 여부/역할(매니저 이상) 체크는 AdminAccessInterceptor가 컨트롤러 진입 전에 미리 걸러줌
+    // (매핑 경로가 "/manage/**"라서 자동 적용). 아래 getLoginUser는 검증된 사용자 정보 조회용.
 
     /***********************************
      *  URL      :   "/venues"

@@ -74,16 +74,9 @@ public class PerformanceController {
      *  param    :   month("2026-08" 형식, 생략 가능 — 없으면 이번 달)
      *  result   :   List<RoundDTO>
      ************************************/
-    // [month 파라미터 처리 방식]
-    // 원래 @RequestParam String month (필수)였는데, 파라미터를 빼고 호출하면 Spring이
-    // MissingServletRequestParameterException 을 던지고 GlobalExceptionHandler 에 해당 핸들러가 없어서
-    // 500(C002 서버 오류)으로 떨어졌다. 클라이언트 잘못인데 서버 오류로 보이는 게 문제.
-    //
-    // 해결: 필수에서 빼고(required = false) 없으면 "이번 달"을 기본값으로 쓴다.
-    //   - 달력 화면은 처음 열 때 볼 달이 정해져 있지 않은 게 자연스러워서 기본값이 실제로 쓸모 있음
-    //   - GlobalExceptionHandler 를 건드리면 다른 API 응답까지 같이 바뀌므로 이 API 안에서만 해결
-    // 참고: "2026-13" 같은 잘못된 형식이 들어오면 DATE_FORMAT 비교에서 아무것도 안 맞아 빈 배열이 나온다
-    //       (파라미터 바인딩이라 SQL 주입 위험은 없음).
+    // month를 필수(@RequestParam String)로 뒀을 때 생략 호출 시 MissingServletRequestParameterException이
+    // 500으로 떨어지던 문제 — required=false로 빼고 없으면 "이번 달"을 기본값으로 씀.
+    // 잘못된 형식("2026-13")은 DATE_FORMAT 비교에서 안 맞아 빈 배열만 반환(SQL 주입 위험 없음).
     @GetMapping("/{performanceId}/calendar")
     public List<RoundDTO> calendar(@PathVariable Long performanceId,
                                    @RequestParam(required = false) String month) {

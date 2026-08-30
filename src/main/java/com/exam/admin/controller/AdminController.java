@@ -21,8 +21,8 @@ public class AdminController {
         this.userMapper = userMapper;
     }
 
-    // 2026-08-18: 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 "/admin/**" 요청 진입 전에
-    // 미리 걸러줌. 여기 getLoginUser는 검증된 로그인 사용자 정보를 꺼내 쓰는 용도로만 남겨둠.
+    // 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 "/admin/**" 요청 진입 전에 미리 걸러줌.
+    // 여기 getLoginUser는 검증된 로그인 사용자 정보를 꺼내 쓰는 용도로만 남겨둠.
 
     /***********************************
      * URL : "/roles"

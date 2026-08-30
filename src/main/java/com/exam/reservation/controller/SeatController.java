@@ -26,16 +26,8 @@ public class SeatController {
     /***********************************
      *  URL      :   "/{scheduleId}/seats"
      *  이름      :   공연 좌석 조회
-     *  기능      :   선택한 공연 회차의 좌석 목록을 조회
-     *
-     *  2026-08-21: 로그인 + 대기열 통과 여부 검증을 추가함.
-     *  그전엔 이 API에 아무 검사도 없어서, 대기열 팝업을 거치지 않고 브라우저 주소창에
-     *  /seats/{roundId}를 직접 쳐도 좌석 화면이 그대로 열렸음 — MAX_ACTIVE_USERS(150)로
-     *  동시 접속을 제한하려던 대기열 설계 전체가 프론트 UX에만 의존하고 있어서 사실상
-     *  무력화된 상태였음(QueueServiceImpl.canEnter가 어디서도 호출되지 않고 있었음).
-     *  좌석 화면에 도달할 수 있는 인원 자체가 대기열 상한(150명)으로 묶여 있으므로,
-     *  3초 폴링마다 이 검사가 돌아도 Redis 부하는 초당 50건 수준이라 문제 없음.
-     *
+     *  기능      :   선택한 공연 회차의 좌석 목록을 조회. 로그인 + 대기열 통과 여부(canEnter)를
+     *              검증 — 없으면 대기열 팝업 없이 URL 직접 접근으로 동시접속 제한을 우회할 수 있었음
      *  method   :   Get
      *  param    :   Long scheduleId, String queueToken, HttpSession
      *  return   :   List<SeatDTO>

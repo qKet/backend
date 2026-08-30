@@ -37,11 +37,9 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     /***********************************
      *  이름      :   reserve
-     *  기능      :   공연 좌석 예매 (동시성 처리) — HOLD01_HOLD03: 락 구현을 직접 짠 SETNX+Lua에서
-     *              Redisson RLock으로 교체. 동작(동일 좌석 동시요청 중 1건만 성공)은 기존과 동일.
-     *              2026-08-18: DB 쓰기는 ReservationCommitter(별도 트랜잭션 빈)로 분리하고,
-     *              알림 발송(SQS)은 트랜잭션·분산락이 모두 끝난 뒤로 옮김 — 느린 외부 통신
-     *              때문에 DB 커넥션/좌석 락을 필요 이상으로 오래 붙잡지 않기 위함.
+     *  기능      :   공연 좌석 예매(동시성 처리, Redisson RLock — 동일 좌석 동시요청 중 1건만 성공).
+     *              DB 쓰기는 ReservationCommitter(별도 트랜잭션 빈)로 분리, 알림 발송(SQS)은
+     *              트랜잭션·분산락이 모두 끝난 뒤로 옮김 — DB 커넥션/좌석 락을 오래 안 붙잡게
      *  param    :  String,Long,Long,Long,String
      *  return   :   Map<String, Object>
      ************************************/
@@ -49,10 +47,8 @@ public class ReservationServiceImpl implements ReservationService {
         String lockKey = "lock:reservation:" + seatId;
         RLock lock = redissonClient.getLock(lockKey);
 
-        // waitTime=0: 기존 SETNX와 동일하게 "선점 실패 시 대기하지 않고 즉시 실패" 유지.
-        // leaseTime=10초: 기존 TTL(10초)과 동일 — 이 값을 주면 Redisson의 자동 연장(watchdog)이 꺼지고
-        // 정확히 10초 뒤 자동 해제됨. (watchdog을 쓰려면 leaseTime을 아예 생략해야 하는데,
-        // "기존로직 유지" 요구사항이라 TTL을 그대로 고정값 10초로 맞춤 — 코드 리뷰 참고)
+        // waitTime=0: 선점 실패 시 대기 없이 즉시 실패. leaseTime=10초를 주면 Redisson 자동 연장
+        // (watchdog)이 꺼지고 정확히 10초 뒤 자동 해제됨 — 고정 TTL을 원하므로 watchdog 미사용.
         boolean acquired;
         try {
             acquired = lock.tryLock(0, 10, TimeUnit.SECONDS);
@@ -68,10 +64,8 @@ public class ReservationServiceImpl implements ReservationService {
         try {
             result = reservationCommitter.commitReserve(userId, reservationId, roundId, seatId, queueToken, clientIp);
         } finally {
-            // isHeldByCurrentThread()로 먼저 확인하는 이유: TTL(10초)이 이미 만료돼서 다른 스레드가
-            // 새로 락을 잡은 상태에서 이 스레드가 뒤늦게 unlock()을 호출하면 IllegalMonitorStateException이
-            // 나거나(Redisson이 소유자 아님을 감지) 최악의 경우 남의 락을 풀어버릴 수 있음 —
-            // 기존 compare-and-delete Lua 스크립트가 하던 일을 Redisson이 이 체크로 대신해줌
+            // isHeldByCurrentThread() 확인 없이 unlock()하면, TTL 만료 후 다른 스레드가 이미 잡은
+            // 락을 남이 풀어버릴 수 있음(IllegalMonitorStateException 또는 최악의 경우 오작동).
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
@@ -110,8 +104,8 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     /***********************************
      *  이름      :  cancel
-     *  기능      :  예매 취소 기능 — 2026-08-18: DB 쓰기는 ReservationCommitter로 분리하고,
-     *              취소 확인 알림(SQS)은 트랜잭션이 끝난 뒤로 옮김(reserve()와 동일한 이유)
+     *  기능      :  예매 취소 — DB 쓰기는 ReservationCommitter로 분리, 취소 확인 알림(SQS)은
+     *              트랜잭션이 끝난 뒤로 옮김(reserve()와 동일한 이유)
      *  param    :  Long,String
      *  return   :  Map<String, Object>
      ************************************/

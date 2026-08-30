@@ -20,9 +20,8 @@ public class WebUtil {
         return request.getRemoteAddr();
     }
 
-    // 2026-08-18: 관리자 컨트롤러 6개가 각자 만들어 쓰던 private getLoginUser()를 여기 하나로 통합.
-    // 인가(관리자/매니저 여부) 체크 자체는 AdminAccessInterceptor가 컨트롤러 진입 전에 이미
-    // 걸러주므로, 컨트롤러 메서드 안에서는 "로그인된 사용자 정보를 꺼내 쓰는 용도"로만 호출하면 됨.
+    // 관리자 컨트롤러들이 각자 만들어 쓰던 private getLoginUser()를 여기 하나로 통합. 인가 체크는
+    // AdminAccessInterceptor가 이미 걸러주므로, 여기선 로그인된 사용자 정보만 꺼내 쓰면 됨.
     public static UserDTO getLoginUser(HttpSession session) {
         return (UserDTO) session.getAttribute("loginUser");
     }
