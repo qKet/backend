@@ -27,19 +27,11 @@ public class ReservationController {
     /***********************************
      *  URL      :  "/reservations"
      *  이름      :   reserve
-     *  기능      :   예약
-     *
-     *  2026-08-21: 대기열 통과 여부(canEnter) 검증을 추가함. 그전엔 queueToken이 예매 성공 후
-     *  대기열 자리를 반납(leave)하는 용도로만 쓰이고 "이 토큰이 실제로 입장 자격이 있는지"는
-     *  아무도 확인하지 않아서, 대기열 팝업을 거치지 않고 이 API를 직접 호출하면 동시 접속
-     *  제한(MAX_ACTIVE_USERS=150)을 그대로 우회할 수 있었음.
-     *
-     *  검증을 ReservationServiceImpl.reserve()가 아니라 이 컨트롤러에 두는 이유:
-     *  reserve()는 결제 승인(PaymentReservationCommitter.commit)에서도 호출되는데, 결제 흐름은
-     *  토스 결제창에서 카드 입력/인증에 시간이 걸려 그 사이 대기열 자격(ACTIVE_TTL 10분)이
-     *  만료될 수 있음. 서비스 레이어에서 막으면 "돈은 이미 결제됐는데 좌석 확정이 거부되고
-     *  결제가 자동 취소되는" 상황을 새로 만들게 되므로, 직접 예약 경로에서만 검증함.
-     *
+     *  기능      :   예약 — 대기열 통과 여부(canEnter)를 검증(없으면 API 직접 호출로 동시접속
+     *              제한을 우회할 수 있었음). 검증을 서비스 레이어가 아니라 여기 두는 이유:
+     *              reserve()는 결제 승인(PaymentReservationCommitter.commit)에서도 호출되는데
+     *              결제는 카드 입력 중 대기열 자격이 만료될 수 있어, 그쪽까지 막으면 "결제는
+     *              됐는데 좌석 확정이 거부되고 자동취소되는" 상황이 생김 — 직접 예약 경로에서만 검증
      *  method   :   POST
      *  param    :   Map<String, Object>, HttpSession
      *  return   :   Map<String, Object>

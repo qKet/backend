@@ -13,10 +13,9 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 
-// AI01_SPOIL01 — 감상평 본문을 OpenAI에 보내 스포일러 포함 여부를 자동 판별한다.
-// 사용자가 직접 체크하는 UI 없이 전적으로 AI 판단에만 의존하는 "완전 자동화" 방식으로 결정했음
-// (2026-08-05 사용자 확인) — 대신 AI 호출이 실패하거나 키가 비어있으면 무조건 false(스포일러 아님)로
-// 폴백해서, 이 기능 하나 때문에 감상평 작성 자체가 막히는 일은 없게 한다.
+// 감상평 본문을 OpenAI에 보내 스포일러 포함 여부를 자동 판별 — 사용자 확인 UI 없이 전적으로 AI
+// 판단에만 의존하는 완전 자동화 방식. AI 호출 실패/키 비어있으면 무조건 false로 폴백해서, 이
+// 기능 하나 때문에 감상평 작성 자체가 막히지 않게 함.
 @Service
 public class SpoilerDetectionServiceImpl implements SpoilerDetectionService {
 

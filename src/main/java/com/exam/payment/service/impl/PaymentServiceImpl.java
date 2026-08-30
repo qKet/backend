@@ -57,11 +57,9 @@ public class PaymentServiceImpl implements PaymentService {
         this.tossSecretKey = tossSecretKey;
     }
 
-    // 2026-08-18: 이 메서드에서 @Transactional을 뗐음 — 원래는 메서드 전체가 하나의 트랜잭션이라
-    // confirmWithToss()(토스 서버로 나가는 실제 네트워크 호출)가 느려지는 동안 DB 커넥션을 계속
-    // 붙잡고 있었음. 트래픽이 몰리는 오픈런 시점에 커넥션 풀 고갈로 이어질 수 있는 구조라,
-    // "DB 작업이 필요한 부분"만 PaymentReservationCommitter.commit()으로 옮기고(거기에
-    // @Transactional이 있음), 여기 confirm()은 트랜잭션 없이 그 앞뒤로 토스 API만 호출함.
+    // 이 메서드에는 @Transactional을 안 씀 — confirmWithToss()(토스로 나가는 실제 네트워크 호출)가
+    // 느려지는 동안 DB 커넥션을 계속 붙잡으면 오픈런 트래픽에 커넥션 풀 고갈로 이어짐. DB 작업은
+    // PaymentReservationCommitter.commit()으로 분리(거기서 트랜잭션), 여기는 토스 API만 호출.
     @Override
     public PaymentDTO confirm(PaymentConfirmRequestDTO request, String userId, String clientIp) {
         // 멱등성 체크: 같은 orderId로 이미 처리된 결제면 재승인/재예매 시도 없이 그 결과를 그대로 반환.

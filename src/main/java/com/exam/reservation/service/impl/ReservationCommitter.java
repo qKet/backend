@@ -9,13 +9,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 
 // ReservationServiceImpl.reserve()/cancel()에서 "DB에 실제로 쓰는 부분"만 떼어낸 트랜잭션 경계.
-// 별도 클래스(빈)로 분리한 이유: Spring @Transactional은 프록시 기반으로 동작해서, 같은 클래스
-// 안에서 this.commitXxx(...)처럼 자기 자신을 호출하면 프록시를 거치지 않아 @Transactional이
-// 조용히 무시됨(self-invocation 문제) — payment/service/impl/PaymentReservationCommitter와 동일한 이유.
+// 별도 빈으로 분리한 이유는 PaymentReservationCommitter와 동일(self-invocation으로
+// @Transactional이 무시되는 문제 방지).
 //
-// 예매/취소 확정 알림(ReservationNotificationService, 내부적으로 DB 조회 2번 + SQS 통신)은
-// 여기 안 넣고 호출부(ReservationServiceImpl)에서 이 트랜잭션이 끝나고 분산락도 풀린 "다음"에
-// 실행함 — DB 커넥션과 좌석 락을 붙잡은 채로 느린 외부 통신을 하지 않기 위함.
+// 예매/취소 확정 알림(SQS 통신 포함)은 여기 안 넣고 호출부에서 트랜잭션·분산락이 끝난 다음에
+// 실행함 — DB 커넥션과 좌석 락을 붙잡은 채로 느린 외부 통신을 안 하기 위함.
 @Component
 class ReservationCommitter {
 

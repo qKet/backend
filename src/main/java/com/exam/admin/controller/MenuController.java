@@ -22,7 +22,7 @@ public class MenuController {
         this.menuService = menuService;
     }
 
-    // 2026-08-18: 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 미리 걸러줌.
+    // 로그인/관리자(3) 여부 체크는 AdminAccessInterceptor가 미리 걸러줌.
 
     /***********************************
      * URL : "/admin/menus"
